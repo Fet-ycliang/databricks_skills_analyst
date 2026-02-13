@@ -1,43 +1,43 @@
-# Development & Testing Workflow
+# 開發與測試工作流程 (Development & Testing Workflow)
 
-MCP-based workflow for developing and testing agents on Databricks.
+在 Databricks 上開發和測試代理的 MCP 工作流程。
 
-> **If MCP tools are not available**, use Databricks CLI or the Python SDK directly. See [Databricks CLI docs](https://docs.databricks.com/dev-tools/cli/) for `databricks workspace import` and `databricks clusters spark-submit` commands.
+> **如果 MCP 工具不可用**，請直接使用 Databricks CLI 或 Python SDK。參見 [Databricks CLI 文件](https://docs.databricks.com/dev-tools/cli/) 以了解 `databricks workspace import` 和 `databricks clusters spark-submit` 指令。
 
-## Overview
+## 概述
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ Step 1: Write agent code locally (agent.py)                 │
+│ 步驟 1：在本地撰寫代理程式碼 (agent.py)                     │
 └─────────────────────────────────────────────────────────────┘
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ Step 2: Upload to workspace                                 │
-│   → upload_folder MCP tool                                  │
+│ 步驟 2：上傳到工作區                                        │
+│   → upload_folder MCP 工具                                  │
 └─────────────────────────────────────────────────────────────┘
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ Step 3: Install packages                                    │
-│   → execute_databricks_command MCP tool                     │
+│ 步驟 3：安裝套件                                            │
+│   → execute_databricks_command MCP 工具                     │
 └─────────────────────────────────────────────────────────────┘
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ Step 4: Test agent (iterate)                                │
-│   → run_python_file_on_databricks MCP tool                  │
-│   → If error: fix locally, re-upload, re-run                │
+│ 步驟 4：測試代理 (迭代)                                     │
+│   → run_python_file_on_databricks MCP 工具                  │
+│   → 若錯誤：本地修正，重新上傳，重新執行                    │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## Step 1: Create Local Files
+## 步驟 1：建立本地檔案
 
-Create a project folder with your agent:
+建立包含您的代理的專案資料夾：
 
 ```
 my_agent/
-├── agent.py           # Agent implementation (ResponsesAgent)
-├── test_agent.py      # Local testing script
-├── log_model.py       # MLflow logging script
-└── requirements.txt   # Dependencies (optional)
+├── agent.py           # 代理實作 (ResponsesAgent)
+├── test_agent.py      # 本地測試腳本
+├── log_model.py       # MLflow 記錄腳本
+└── requirements.txt   # 相依性 (選擇性)
 ```
 
 ### agent.py
@@ -57,7 +57,7 @@ class MyAgent(ResponsesAgent):
     def predict(self, request: ResponsesAgentRequest) -> ResponsesAgentResponse:
         messages = [{"role": m.role, "content": m.content} for m in request.input]
         response = self.llm.invoke(messages)
-        # CRITICAL: Must use helper methods for output items
+        # 關鍵：必須使用輔助方法來處理輸出項目
         return ResponsesAgentResponse(
             output=[self.create_text_output_item(text=response.content, id="msg_1")]
         )
@@ -72,20 +72,20 @@ mlflow.models.set_model(AGENT)
 from agent import AGENT
 from mlflow.types.responses import ResponsesAgentRequest, ChatContext
 
-# Test request
+# 測試請求
 request = ResponsesAgentRequest(
     input=[{"role": "user", "content": "What is Databricks?"}],
     context=ChatContext(user_id="test@example.com")
 )
 
-# Run prediction
+# 執行預測
 result = AGENT.predict(request)
 print("Response:", result.model_dump(exclude_none=True))
 ```
 
-## Step 2: Upload to Workspace
+## 步驟 2：上傳到工作區
 
-Use the `upload_folder` MCP tool:
+使用 `upload_folder` MCP 工具：
 
 ```
 upload_folder(
@@ -94,11 +94,11 @@ upload_folder(
 )
 ```
 
-This uploads all files in parallel.
+這會平行上傳所有檔案。
 
-## Step 3: Install Packages
+## 步驟 3：安裝套件
 
-Use `execute_databricks_command` to install dependencies:
+使用 `execute_databricks_command` 安裝相依性：
 
 ```
 execute_databricks_command(
@@ -106,9 +106,9 @@ execute_databricks_command(
 )
 ```
 
-**Important:** Save the returned `cluster_id` and `context_id` for subsequent calls - reusing the context is faster and keeps packages installed.
+**重要：** 儲存返回的 `cluster_id` 和 `context_id` 以供後續呼叫使用 - 重用 context 更快且能保留已安裝的套件。
 
-### Follow-up Commands (Reuse Context)
+### 後續指令 (重用 Context)
 
 ```
 execute_databricks_command(
@@ -118,9 +118,9 @@ execute_databricks_command(
 )
 ```
 
-## Step 4: Test the Agent
+## 步驟 4：測試代理
 
-Use `run_python_file_on_databricks`:
+使用 `run_python_file_on_databricks`：
 
 ```
 run_python_file_on_databricks(
@@ -130,22 +130,22 @@ run_python_file_on_databricks(
 )
 ```
 
-### If Test Fails
+### 如果測試失敗
 
-1. Read the error from the output
-2. Fix the local file (`agent.py` or `test_agent.py`)
-3. Re-upload: `upload_folder(...)`
-4. Re-run: `run_python_file_on_databricks(...)`
+1. 從輸出中讀取錯誤
+2. 修正本地檔案 (`agent.py` 或 `test_agent.py`)
+3. 重新上傳：`upload_folder(...)`
+4. 重新執行：`run_python_file_on_databricks(...)`
 
-### Iteration Tips
+### 迭代技巧
 
-- **Keep context alive** - Reuse `cluster_id` and `context_id` for faster iterations
-- **Packages persist** - Once installed, packages stay in the context
-- **Check imports first** - Run a minimal test before full agent test
+- **保持 context 存活** - 重用 `cluster_id` 和 `context_id` 以便更快的迭代
+- **套件持久化** - 一旦安裝，套件會保留在 context 中
+- **先檢查匯入** - 在完整代理測試前執行最小測試
 
-## Quick Debugging Commands
+## 快速除錯指令
 
-### Check if packages are installed
+### 檢查套件是否已安裝
 
 ```
 execute_databricks_command(
@@ -155,7 +155,7 @@ execute_databricks_command(
 )
 ```
 
-### List available endpoints
+### 列出可用端點
 
 ```
 execute_databricks_command(
@@ -170,7 +170,7 @@ for ep in list(w.serving_endpoints.list())[:10]:
 )
 ```
 
-### Test LLM endpoint directly
+### 直接測試 LLM 端點
 
 ```
 execute_databricks_command(
@@ -185,20 +185,20 @@ print(response.content)
 )
 ```
 
-## Workflow Summary
+## 工作流程總結
 
-| Step | MCP Tool | Purpose |
+| 步驟 | MCP 工具 | 用途 |
 |------|----------|---------|
-| Upload files | `upload_folder` | Sync local files to workspace |
-| Install packages | `execute_databricks_command` | Set up dependencies |
-| Restart Python | `execute_databricks_command` | Apply package changes |
-| Test agent | `run_python_file_on_databricks` | Run test script |
-| Debug | `execute_databricks_command` | Quick checks |
+| 上傳檔案 | `upload_folder` | 將本地檔案同步到工作區 |
+| 安裝套件 | `execute_databricks_command` | 設定相依性 |
+| 重啟 Python | `execute_databricks_command` | 應用套件變更 |
+| 測試代理 | `run_python_file_on_databricks` | 執行測試腳本 |
+| 除錯 | `execute_databricks_command` | 快速檢查 |
 
-## Next Steps
+## 下一步
 
-Once your agent tests successfully:
+一旦您的代理測試成功：
 
-1. **Log to MLflow** → See [6-logging-registration.md](6-logging-registration.md)
-2. **Deploy endpoint** → See [7-deployment.md](7-deployment.md)
-3. **Query endpoint** → See [8-querying-endpoints.md](8-querying-endpoints.md)
+1. **記錄到 MLflow** → 參見 [6-logging-registration.md](6-logging-registration.md)
+2. **部署端點** → 參見 [7-deployment.md](7-deployment.md)
+3. **查詢端點** → 參見 [8-querying-endpoints.md](8-querying-endpoints.md)

@@ -1,29 +1,29 @@
-# Lakebase Autoscaling Connection Patterns
+# Lakebase Autoscaling 連線模式 (Connection Patterns)
 
-## Overview
+## 概述
 
-This document covers different connection patterns for Lakebase Autoscaling, from simple scripts to production applications with token refresh.
+本文件涵蓋 Lakebase Autoscaling 的不同連線模式，從簡單的腳本到具有權杖重新整理的生產應用程式。
 
-## Authentication Methods
+## 驗證方法
 
-Lakebase Autoscaling supports two authentication methods:
+Lakebase Autoscaling 支援兩種驗證方法：
 
-| Method | Token Lifetime | Best For |
+| 方法 | 權杖生命週期 | 最適合 |
 |--------|---------------|----------|
-| **OAuth tokens** | 1 hour (must refresh) | Interactive sessions, workspace-integrated apps |
-| **Native Postgres passwords** | No expiry | Long-running processes, tools without token rotation |
+| **OAuth 權杖** | 1 小時 (必須重新整理) | 互動式工作階段、工作區整合應用程式 |
+| **原生 Postgres 密碼** | 無到期 | 長時間執行的程序、無權杖輪替的工具 |
 
-**Connection timeouts (both methods):**
-- **24-hour idle timeout**: Connections with no activity for 24 hours are automatically closed
-- **3-day maximum connection life**: Connections alive for more than 3 days may be closed
+**連線逾時 (兩種方法)：**
+- **24 小時閒置逾時**：24 小時無活動的連線將被自動關閉
+- **3 天最大連線壽命**：存活超過 3 天的連線可能會被關閉
 
-Design your applications to handle connection timeouts with retry logic.
+設計您的應用程式以使用重試邏輯處理連線逾時。
 
-## Connection Methods
+## 連線方法
 
-### 1. Direct psycopg Connection (Simple Scripts)
+### 1. 直接 psycopg 連線 (簡單腳本)
 
-For one-off scripts or notebooks:
+對於一次性腳本或筆記本：
 
 ```python
 import psycopg
@@ -31,14 +31,14 @@ from databricks.sdk import WorkspaceClient
 
 def get_connection(project_id: str, branch_id: str = "production",
                    endpoint_id: str = None, database_name: str = "databricks_postgres"):
-    """Get a database connection with fresh OAuth token."""
+    """取得具有新鮮 OAuth 權杖的資料庫連線。"""
     w = WorkspaceClient()
 
-    # Get endpoint details to find the host
+    # 取得端點詳細資訊以尋找主機
     if endpoint_id:
         ep_name = f"projects/{project_id}/branches/{branch_id}/endpoints/{endpoint_id}"
     else:
-        # List endpoints and pick the primary R/W one
+        # 列出端點並選擇主要 R/W 端點
         endpoints = list(w.postgres.list_endpoints(
             parent=f"projects/{project_id}/branches/{branch_id}"
         ))
@@ -47,10 +47,10 @@ def get_connection(project_id: str, branch_id: str = "production",
     endpoint = w.postgres.get_endpoint(name=ep_name)
     host = endpoint.status.hosts.host
 
-    # Generate OAuth token (valid for 1 hour)
+    # 產生 OAuth 權杖 (有效 1 小時)
     cred = w.postgres.generate_database_credential(endpoint=ep_name)
 
-    # Build connection string
+    # 建構連線字串
     conn_string = (
         f"host={host} "
         f"dbname={database_name} "
@@ -61,16 +61,16 @@ def get_connection(project_id: str, branch_id: str = "production",
 
     return psycopg.connect(conn_string)
 
-# Usage
+# 用法
 with get_connection("my-app") as conn:
     with conn.cursor() as cur:
         cur.execute("SELECT NOW()")
         print(cur.fetchone())
 ```
 
-### 2. Connection Pool with Token Refresh (Production)
+### 2. 具有權杖重新整理的連線池 (生產)
 
-For long-running applications that need connection pooling:
+對於需要連線池的長時間執行應用程式：
 
 ```python
 import asyncio
@@ -84,7 +84,7 @@ from databricks.sdk import WorkspaceClient
 
 
 class LakebaseAutoscaleConnectionManager:
-    """Manages Lakebase Autoscaling connections with automatic token refresh."""
+    """管理具有自動權杖重新整理的 Lakebase Autoscaling 連線。"""
 
     def __init__(
         self,
@@ -93,7 +93,7 @@ class LakebaseAutoscaleConnectionManager:
         database_name: str = "databricks_postgres",
         pool_size: int = 5,
         max_overflow: int = 10,
-        token_refresh_seconds: int = 3000  # 50 minutes
+        token_refresh_seconds: int = 3000  # 50 分鐘
     ):
         self.project_id = project_id
         self.branch_id = branch_id
@@ -108,9 +108,9 @@ class LakebaseAutoscaleConnectionManager:
         self._session_maker = None
 
     def _generate_token(self) -> str:
-        """Generate fresh OAuth token."""
+        """產生新鮮的 OAuth 權杖。"""
         w = WorkspaceClient()
-        # Get primary endpoint name for token scoping
+        # 取得主要端點名稱以進行權杖範圍設定
         endpoints = list(w.postgres.list_endpoints(
             parent=f"projects/{self.project_id}/branches/{self.branch_id}"
         ))
@@ -119,7 +119,7 @@ class LakebaseAutoscaleConnectionManager:
         return cred.token
 
     def _get_host(self) -> str:
-        """Get the connection host from the primary endpoint."""
+        """從主要端點取得連線主機。"""
         w = WorkspaceClient()
         endpoints = list(w.postgres.list_endpoints(
             parent=f"projects/{self.project_id}/branches/{self.branch_id}"
@@ -132,7 +132,7 @@ class LakebaseAutoscaleConnectionManager:
         return endpoint.status.hosts.host
 
     async def _refresh_loop(self):
-        """Background task to refresh token periodically."""
+        """定期重新整理權杖的背景任務。"""
         while True:
             await asyncio.sleep(self.token_refresh_seconds)
             try:
@@ -141,17 +141,17 @@ class LakebaseAutoscaleConnectionManager:
                 print(f"Token refresh failed: {e}")
 
     def initialize(self):
-        """Initialize database engine and start token refresh."""
+        """初始化資料庫引擎並開始權杖重新整理。"""
         w = WorkspaceClient()
 
-        # Get host info
+        # 取得主機資訊
         host = self._get_host()
         username = w.current_user.me().user_name
 
-        # Generate initial token
+        # 產生初始權杖
         self._current_token = self._generate_token()
 
-        # Create engine (password injected via event)
+        # 建立引擎 (密碼透過事件注入)
         url = (
             f"postgresql+psycopg://{username}@"
             f"{host}:5432/{self.database_name}"
@@ -165,7 +165,7 @@ class LakebaseAutoscaleConnectionManager:
             connect_args={"sslmode": "require"}
         )
 
-        # Inject token on connect
+        # 在連線時注入權杖
         @event.listens_for(self._engine.sync_engine, "do_connect")
         def inject_token(dialect, conn_rec, cargs, cparams):
             cparams["password"] = self._current_token
@@ -177,12 +177,12 @@ class LakebaseAutoscaleConnectionManager:
         )
 
     def start_refresh(self):
-        """Start background token refresh task."""
+        """開始背景權杖重新整理任務。"""
         if not self._refresh_task:
             self._refresh_task = asyncio.create_task(self._refresh_loop())
 
     async def stop_refresh(self):
-        """Stop token refresh task."""
+        """停止權杖重新整理任務。"""
         if self._refresh_task:
             self._refresh_task.cancel()
             try:
@@ -193,18 +193,18 @@ class LakebaseAutoscaleConnectionManager:
 
     @asynccontextmanager
     async def session(self) -> AsyncGenerator[AsyncSession, None]:
-        """Get a database session."""
+        """取得資料庫 Session。"""
         async with self._session_maker() as session:
             yield session
 
     async def close(self):
-        """Close all connections."""
+        """關閉所有連線。"""
         await self.stop_refresh()
         if self._engine:
             await self._engine.dispose()
 
 
-# Usage in FastAPI
+# 在 FastAPI 中的用法
 from fastapi import FastAPI
 
 app = FastAPI()
@@ -226,22 +226,22 @@ async def get_data():
         return result.fetchall()
 ```
 
-### 3. Static URL Mode (Local Development)
+### 3. 靜態 URL 模式 (本地開發)
 
-For local development, use a static connection URL:
+對於本地開發，使用靜態連線 URL：
 
 ```python
 import os
 from sqlalchemy.ext.asyncio import create_async_engine
 
-# Set environment variable with full connection URL
+# 設定環境變數為完整的連線 URL
 # LAKEBASE_PG_URL=postgresql://user:password@host:5432/database
 
 def get_database_url() -> str:
-    """Get database URL from environment."""
+    """從環境取得資料庫 URL。"""
     url = os.environ.get("LAKEBASE_PG_URL")
     if url and url.startswith("postgresql://"):
-        # Convert to psycopg3 async driver
+        # 轉換為 psycopg3 async driver
         url = url.replace("postgresql://", "postgresql+psycopg://", 1)
     return url
 
@@ -252,16 +252,16 @@ engine = create_async_engine(
 )
 ```
 
-### 4. DNS Resolution Workaround (macOS)
+### 4. DNS 解析解決方案 (macOS)
 
-Python's `socket.getaddrinfo()` fails with long hostnames on macOS. Use `dig` as fallback:
+Python 的 `socket.getaddrinfo()` 在 macOS 上遇到長主機名稱會失敗。使用 `dig` 作為後備方案：
 
 ```python
 import subprocess
 import socket
 
 def resolve_hostname(hostname: str) -> str:
-    """Resolve hostname using dig command (macOS workaround)."""
+    """使用 dig 命令解析主機名稱 (macOS 解決方案)。"""
     try:
         return socket.gethostbyname(hostname)
     except socket.gaierror:
@@ -281,7 +281,7 @@ def resolve_hostname(hostname: str) -> str:
 
     raise RuntimeError(f"Could not resolve hostname: {hostname}")
 
-# Use with psycopg
+# 與 psycopg 一起使用
 conn_params = {
     "host": hostname,       # For TLS SNI
     "hostaddr": resolve_hostname(hostname),  # Actual IP
@@ -293,12 +293,12 @@ conn_params = {
 conn = psycopg.connect(**conn_params)
 ```
 
-## Best Practices
+## 最佳實踐
 
-1. **Always use SSL**: Set `sslmode=require` in all connections
-2. **Implement token refresh**: Tokens expire after 1 hour; refresh at 50 minutes
-3. **Use connection pooling**: Avoid creating new connections per request
-4. **Handle DNS issues on macOS**: Use the `hostaddr` workaround if needed
-5. **Close connections properly**: Use context managers or explicit cleanup
-6. **Handle scale-to-zero wake-up**: First connection after idle may take 2-5 seconds
-7. **Log token refresh events**: Helps debug authentication issues
+1. **始終使用 SSL**: 在所有連線中設定 `sslmode=require`
+2. **實作權杖重新整理**: 權杖在 1 小時後過期；在 50 分鐘時重新整理
+3. **使用連線池**: 避免每個請求建立新連線
+4. **在 macOS 上處理 DNS 問題**: 如有需要，使用 `hostaddr` 解決方案
+5. **正確關閉連線**: 使用上下文管理器或顯式清理
+6. **處理縮減至零喚醒**: 閒置後的第一個連線可能需要 2-5 秒
+7. **記錄權杖重新整理事件**: 有助於除錯驗證問題

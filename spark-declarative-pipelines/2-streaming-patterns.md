@@ -1,20 +1,20 @@
-# Streaming Patterns for SDP
+# SDP 的串流模式 (Streaming Patterns)
 
-Streaming-specific patterns including deduplication, windowed aggregations, late-arriving data handling, and stateful operations.
+特定於串流的模式，包括去重 (Deduplication)、視窗聚合 (Windowed Aggregations)、晚到資料處理 (Late-arriving Data) 以及有狀態操作 (Stateful Operations)。
 
 ---
 
-## Deduplication Patterns
+## 去重模式 (Deduplication Patterns)
 
-### By Key
+### 依鍵 (By Key)
 
 ```sql
--- Bronze: Ingest all (may contain duplicates)
+-- Bronze: 攝取所有 (可能包含重複)
 CREATE OR REPLACE STREAMING TABLE bronze_events AS
 SELECT *, current_timestamp() AS _ingested_at
 FROM read_stream(...);
 
--- Silver: Deduplicate by event_id
+-- Silver: 依 event_id 去重
 CREATE OR REPLACE STREAMING TABLE silver_events_dedup AS
 SELECT
   event_id, user_id, event_type, event_timestamp, _ingested_at
@@ -27,9 +27,9 @@ FROM (
 WHERE rn = 1;
 ```
 
-### With Time Window
+### 搭配時間視窗
 
-Deduplicate within time window to handle late arrivals:
+在時間視窗內去重以處理晚到資料：
 
 ```sql
 CREATE OR REPLACE STREAMING TABLE silver_events_dedup AS
@@ -39,11 +39,11 @@ SELECT
 FROM STREAM bronze_events
 GROUP BY
   event_id, user_id, event_type, event_timestamp,
-  window(event_timestamp, '1 hour')  -- Deduplicate within 1-hour windows
+  window(event_timestamp, '1 hour')  -- 在 1 小時視窗內去重
 HAVING COUNT(*) >= 1;
 ```
 
-### Composite Key
+### 複合鍵 (Composite Key)
 
 ```sql
 CREATE OR REPLACE STREAMING TABLE silver_transactions_dedup AS
@@ -56,12 +56,12 @@ GROUP BY transaction_id, customer_id, amount, transaction_timestamp;
 
 ---
 
-## Windowed Aggregations
+## 視窗聚合 (Windowed Aggregations)
 
-### Tumbling Windows
+### 滾動視窗 (Tumbling Windows)
 
 ```sql
--- 5-minute non-overlapping windows
+-- 5 分鐘不重疊視窗
 CREATE OR REPLACE STREAMING TABLE silver_sensor_5min AS
 SELECT
   sensor_id,
@@ -74,10 +74,10 @@ FROM STREAM bronze_sensor_events
 GROUP BY sensor_id, window(event_timestamp, '5 minutes');
 ```
 
-### Multiple Window Sizes
+### 多種視窗大小
 
 ```sql
--- 1-minute for real-time monitoring
+-- 1 分鐘用於即時監控
 CREATE OR REPLACE STREAMING TABLE gold_sensor_1min AS
 SELECT
   sensor_id,
@@ -88,7 +88,7 @@ SELECT
 FROM STREAM silver_sensor_data
 GROUP BY sensor_id, window(event_timestamp, '1 minute');
 
--- 1-hour for trend analysis
+-- 1 小時用於趨勢分析
 CREATE OR REPLACE STREAMING TABLE gold_sensor_1hour AS
 SELECT
   sensor_id,
@@ -101,34 +101,34 @@ GROUP BY sensor_id, window(event_timestamp, '1 hour');
 
 ---
 
-## Late-Arriving Data
+## 晚到資料 (Late-Arriving Data)
 
-### Event-Time vs Processing-Time
+### 事件時間 vs 處理時間
 
-Always use event timestamp for business logic, not ingestion timestamp:
+業務邏輯務必使用事件時間戳記，而非攝取時間戳記：
 
 ```sql
--- ✅ Use event timestamp
+-- ✅ 使用事件時間
 CREATE OR REPLACE STREAMING TABLE silver_orders AS
 SELECT
-  order_id, order_timestamp,  -- Event time from source
+  order_id, order_timestamp,  -- 來自來源的事件時間
   customer_id, amount,
-  _ingested_at                -- Processing time (debugging only)
+  _ingested_at                -- 處理時間 (僅供除錯)
 FROM STREAM bronze_orders;
 
--- Group by event time
+-- 依事件時間分組
 CREATE OR REPLACE STREAMING TABLE gold_daily_orders AS
 SELECT
-  CAST(order_timestamp AS DATE) AS order_date,  -- Event time
+  CAST(order_timestamp AS DATE) AS order_date,  -- 事件時間
   COUNT(*) AS order_count,
   SUM(amount) AS total_amount
 FROM STREAM silver_orders
 GROUP BY CAST(order_timestamp AS DATE);
 ```
 
-### Handling Out-of-Order with SCD2
+### 使用 SCD2 處理亂序資料
 
-Use SEQUENCE BY with event timestamp. **Clause order matters**: put `APPLY AS DELETE WHEN` before `SEQUENCE BY`. Only list columns in `COLUMNS * EXCEPT (...)` that actually exist in the source (omit `_rescued_data` unless the bronze table uses rescue data). Omit `TRACK HISTORY ON *` if it causes parse errors; the default is equivalent.
+使用 `SEQUENCE BY` 搭配事件時間戳記。**子句順序很重要**: 將 `APPLY AS DELETE WHEN` 放在 `SEQUENCE BY` 之前。在 `COLUMNS * EXCEPT (...)` 中僅列出來源中實際存在的欄位 (除非 Bronze 資料表使用 Rescue Data，否則省略 `_rescued_data`)。若 `TRACK HISTORY ON *` 導致解析錯誤則省略；預設即為相同效果。
 
 ```sql
 CREATE OR REFRESH STREAMING TABLE silver_customers_history;
@@ -138,19 +138,19 @@ AUTO CDC INTO silver_customers_history
 FROM stream(bronze_customer_cdc)
 KEYS (customer_id)
 APPLY AS DELETE WHEN operation = "DELETE"
-SEQUENCE BY event_timestamp  -- Handles out-of-order
+SEQUENCE BY event_timestamp  -- 處理亂序
 COLUMNS * EXCEPT (operation, _ingested_at, _source_file)
 STORED AS SCD TYPE 2;
 ```
 
 ---
 
-## Stateful Operations
+## 有狀態操作 (Stateful Operations)
 
-### Stream-to-Stream Joins
+### 串流對串流 Joins
 
 ```sql
--- Join two streaming sources
+-- Join 兩個串流來源
 CREATE OR REPLACE STREAMING TABLE silver_orders_with_payments AS
 SELECT
   o.order_id, o.customer_id, o.order_timestamp, o.amount AS order_amount,
@@ -161,16 +161,16 @@ INNER JOIN STREAM bronze_payments p
   AND p.payment_timestamp BETWEEN o.order_timestamp AND o.order_timestamp + INTERVAL 1 HOUR;
 ```
 
-### Stream-to-Static Joins
+### 串流對靜態 Joins
 
-Enrich streaming data with dimension tables:
+使用維度資料表豐富串流資料：
 
 ```sql
--- Static dimension (changes infrequently)
+-- 靜態維度 (變更頻率低)
 CREATE OR REPLACE TABLE dim_products AS
 SELECT * FROM catalog.schema.products;
 
--- Stream-to-static join
+-- 串流對靜態 Join
 CREATE OR REPLACE STREAMING TABLE silver_sales_enriched AS
 SELECT
   s.sale_id, s.product_id, s.quantity, s.sale_timestamp,
@@ -180,10 +180,10 @@ FROM STREAM bronze_sales s
 LEFT JOIN dim_products p ON s.product_id = p.product_id;
 ```
 
-### Incremental Aggregations
+### 增量聚合
 
 ```sql
--- Running totals by customer (stateful)
+-- 依客戶的累計總額 (有狀態)
 CREATE OR REPLACE STREAMING TABLE silver_customer_running_totals AS
 SELECT
   customer_id,
@@ -196,12 +196,12 @@ GROUP BY customer_id;
 
 ---
 
-## Session Windows
+## 工作階段視窗 (Session Windows)
 
-Group events into sessions based on inactivity gaps:
+根據閒置間隔將事件分組為工作階段 (Sessions)：
 
 ```sql
--- 30-minute inactivity timeout
+-- 30 分鐘閒置逾時
 CREATE OR REPLACE STREAMING TABLE silver_user_sessions AS
 SELECT
   user_id,
@@ -216,9 +216,9 @@ GROUP BY user_id, session_window(event_timestamp, '30 minutes');
 
 ---
 
-## Anomaly Detection
+## 異常偵測 (Anomaly Detection)
 
-### Real-Time Outlier Detection
+### 即時離群值偵測
 
 ```sql
 CREATE OR REPLACE STREAMING TABLE silver_sensor_with_anomalies AS
@@ -239,14 +239,14 @@ SELECT
   END AS anomaly_flag
 FROM STREAM bronze_sensor_events;
 
--- Route anomalies for alerting
+-- 路由異常以進行警報
 CREATE OR REPLACE STREAMING TABLE silver_sensor_anomalies AS
 SELECT *
 FROM STREAM silver_sensor_with_anomalies
 WHERE anomaly_flag IN ('HIGH_OUTLIER', 'LOW_OUTLIER');
 ```
 
-### Threshold-Based Filtering
+### 基於閾值的過濾
 
 ```sql
 CREATE OR REPLACE STREAMING TABLE silver_high_value_transactions AS
@@ -257,80 +257,80 @@ WHERE amount > 10000;
 
 ---
 
-## Execution Modes
+## 執行模式 (Execution Modes)
 
-Configure at pipeline level (not in SQL):
+在管線層級設定 (非 SQL)：
 
-**Continuous** (real-time, sub-second latency):
+**Continuous** (即時，亞秒級延遲):
 ```yaml
 execution_mode: continuous
 serverless: true
 ```
 
-**Triggered** (scheduled, cost-optimized):
+**Triggered** (排程，成本優化):
 ```yaml
 execution_mode: triggered
-schedule: "0 * * * *"  # Hourly
+schedule: "0 * * * *"  # 每小時
 ```
 
-**When to use**:
-- **Continuous**: Real-time dashboards, alerting, sub-minute SLAs
-- **Triggered**: Daily/hourly reports, batch processing
+**何時使用**:
+- **Continuous**: 即時儀表板、警報、亞分鐘 SLA
+- **Triggered**: 每日/每小時報表、批次處理
 
 ---
 
-## Key Patterns
+## 關鍵模式
 
-### 1. Use Event Timestamps
+### 1. 使用事件時間戳記
 
 ```sql
--- ✅ Event timestamp for logic
+-- ✅ 邏輯使用事件時間
 GROUP BY date_trunc('hour', event_timestamp)
 
--- ❌ Processing timestamp
+-- ❌ 處理時間戳記
 GROUP BY date_trunc('hour', _ingested_at)
 ```
 
-### 2. Window Size Selection
+### 2. 視窗大小選擇
 
-- **1-5 minutes**: Real-time monitoring
-- **15-60 minutes**: Operational dashboards
-- **1-24 hours**: Analytical reports
+- **1-5 分鐘**: 即時監控
+- **15-60 分鐘**: 營運儀表板
+- **1-24 小時**: 分析報表
 
-### 3. State Management
+### 3. 狀態管理
 
-Higher cardinality = more state:
+較高基數 (Cardinality) = 更多狀態：
 
 ```sql
--- High state: 1M users × 10K products × 100M sessions
+-- 高狀態: 1M 使用者 × 10K 產品 × 100M 工作階段
 GROUP BY user_id, product_id, session_id
 
--- Lower state: 1M users × 100 categories × days
+-- 較低狀態: 1M 使用者 × 100 類別 × 天
 GROUP BY user_id, product_category, DATE(event_time)
 ```
 
-Use time windows to bound state retention.
+使用時間視窗來限制狀態保留。
 
-### 4. Deduplicate Early
+### 4. 及早去重
 
-Apply at bronze → silver transition:
+在 Bronze → Silver 轉換時應用：
 
 ```sql
--- Bronze: Accept duplicates
+-- Bronze: 接受重複
 CREATE OR REPLACE STREAMING TABLE bronze_events AS
 SELECT * FROM read_stream(...);
 
--- Silver: Deduplicate immediately
+-- Silver: 立即去重
 CREATE OR REPLACE STREAMING TABLE silver_events AS
 SELECT DISTINCT event_id, event_type, event_timestamp, user_id
 FROM STREAM bronze_events;
 
--- Gold: Work with clean data
+-- Gold: 使用乾淨資料
 CREATE OR REPLACE STREAMING TABLE gold_metrics AS
 SELECT ... FROM STREAM silver_events;
 ```
 
-### 5. Monitor Lag
+### 5. 監控 Lag
 
 ```sql
 CREATE OR REPLACE STREAMING TABLE monitoring_lag AS
@@ -345,12 +345,12 @@ GROUP BY window(kafka_timestamp, '1 minute');
 
 ---
 
-## Common Issues
+## 常見問題
 
-| Issue | Solution |
+| 問題 | 解決方案 |
 |-------|----------|
-| High memory with windows | Use larger windows, reduce group-by cardinality |
-| Duplicate events in output | Add explicit deduplication by unique key |
-| Missing late-arriving events | Increase window size or use longer retention |
-| Stream-to-stream join empty | Verify join conditions and time bounds |
-| State growth over time | Add time windows, reduce cardinality, materialize intermediates |
+| 視窗導致高記憶體使用 | 使用較大視窗，減少 Group-by 基數 |
+| 輸出資料表中有重複事件 | 依唯一鍵加入明確去重 |
+| 遺失晚到事件 | 增加視窗大小或使用較長的保留期 |
+| 串流對串流 Join 為空 | 驗證 Join 條件與時間邊界 |
+| 狀態隨時間增長 | 加入時間視窗，減少基數，物化中介結果 |

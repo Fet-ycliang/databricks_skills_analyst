@@ -1,95 +1,95 @@
 ---
 name: mlflow-evaluation
-description: "MLflow 3 GenAI evaluation for agent development. Use when (1) writing mlflow.genai.evaluate() code, (2) creating @scorer functions, (3) building evaluation datasets from traces, (4) using built-in scorers (Guidelines, Correctness, Safety, RetrievalGroundedness), (5) analyzing traces for latency/errors/architecture, (6) optimizing agent context/prompts/token usage, (7) debugging evaluation failures. Covers the full eval workflow: trace analysis -> dataset building -> scorer creation -> evaluation execution."
+description: "用於代理開發的 MLflow 3 GenAI 評估。在以下情況使用：(1) 撰寫 mlflow.genai.evaluate() 程式碼，(2) 建立 @scorer 函數，(3) 從追蹤 (traces) 建立評估資料集，(4) 使用內建評分器 (Guidelines, Correctness, Safety, RetrievalGroundedness)，(5) 分析追蹤的延遲/錯誤/架構，(6) 優化代理上下文/提示/Token 使用，(7) 除錯評估失敗。涵蓋完整的評估工作流程：追蹤分析 -> 資料集建立 -> 評分器建立 -> 執行評估。"
 ---
 
-# MLflow 3 GenAI Evaluation
+# MLflow 3 GenAI 評估 (MLflow 3 GenAI Evaluation)
 
-## Before Writing Any Code
+## 在撰寫任何程式碼之前
 
-1. **Read GOTCHAS.md** - 15+ common mistakes that cause failures
-2. **Read CRITICAL-interfaces.md** - Exact API signatures and data schemas
+1. **閱讀 GOTCHAS.md** - 15+ 個導致失敗的常見錯誤
+2. **閱讀 CRITICAL-interfaces.md** - 確切的 API 簽章和資料 Schema
 
-## End-to-End Workflows
+## 端到端工作流程
 
-Follow these workflows based on your goal. Each step indicates which reference files to read.
+根據您的目標遵循這些工作流程。每個步驟都指出要閱讀的參考文件。
 
-### Workflow 1: First-Time Evaluation Setup
+### 工作流程 1：首次評估設定
 
-For users new to MLflow GenAI evaluation or setting up evaluation for a new agent.
+適用於剛接觸 MLflow GenAI 評估或為新代理設定評估的使用者。
 
-| Step | Action | Reference Files |
+| 步驟 | 動作 | 參考文件 |
 |------|--------|-----------------|
-| 1 | Understand what to evaluate | `user-journeys.md` (Journey 0: Strategy) |
-| 2 | Learn API patterns | `GOTCHAS.md` + `CRITICAL-interfaces.md` |
-| 3 | Build initial dataset | `patterns-datasets.md` (Patterns 1-4) |
-| 4 | Choose/create scorers | `patterns-scorers.md` + `CRITICAL-interfaces.md` (built-in list) |
-| 5 | Run evaluation | `patterns-evaluation.md` (Patterns 1-3) |
+| 1 | 了解要評估什麼 | `user-journeys.md` (旅程 0：策略) |
+| 2 | 學習 API 模式 | `GOTCHAS.md` + `CRITICAL-interfaces.md` |
+| 3 | 建立初始資料集 | `patterns-datasets.md` (模式 1-4) |
+| 4 | 選擇/建立評分器 | `patterns-scorers.md` + `CRITICAL-interfaces.md` (內建列表) |
+| 5 | 執行評估 | `patterns-evaluation.md` (模式 1-3) |
 
-### Workflow 2: Production Trace -> Evaluation Dataset
+### 工作流程 2：生產追蹤 -> 評估資料集
 
-For building evaluation datasets from production traces.
+適用於從生產追蹤建立評估資料集。
 
-| Step | Action | Reference Files |
+| 步驟 | 動作 | 參考文件 |
 |------|--------|-----------------|
-| 1 | Search and filter traces | `patterns-trace-analysis.md` (MCP tools section) |
-| 2 | Analyze trace quality | `patterns-trace-analysis.md` (Patterns 1-7) |
-| 3 | Tag traces for inclusion | `patterns-datasets.md` (Patterns 16-17) |
-| 4 | Build dataset from traces | `patterns-datasets.md` (Patterns 6-7) |
-| 5 | Add expectations/ground truth | `patterns-datasets.md` (Pattern 2) |
+| 1 | 搜尋並過濾追蹤 | `patterns-trace-analysis.md` (MCP 工具部分) |
+| 2 | 分析追蹤品質 | `patterns-trace-analysis.md` (模式 1-7) |
+| 3 | 標記追蹤以供納入 | `patterns-datasets.md` (模式 16-17) |
+| 4 | 從追蹤建立資料集 | `patterns-datasets.md` (模式 6-7) |
+| 5 | 加入預期結果/基本真值 | `patterns-datasets.md` (模式 2) |
 
-### Workflow 3: Performance Optimization
+### 工作流程 3：效能優化
 
-For debugging slow or expensive agent execution.
+適用於除錯緩慢或昂貴的代理執行。
 
-| Step | Action | Reference Files |
+| 步驟 | 動作 | 參考文件 |
 |------|--------|-----------------|
-| 1 | Profile latency by span | `patterns-trace-analysis.md` (Patterns 4-6) |
-| 2 | Analyze token usage | `patterns-trace-analysis.md` (Pattern 9) |
-| 3 | Detect context issues | `patterns-context-optimization.md` (Section 5) |
-| 4 | Apply optimizations | `patterns-context-optimization.md` (Sections 1-4, 6) |
-| 5 | Re-evaluate to measure impact | `patterns-evaluation.md` (Pattern 6-7) |
+| 1 | 依 Span 分析延遲 | `patterns-trace-analysis.md` (模式 4-6) |
+| 2 | 分析 Token 使用量 | `patterns-trace-analysis.md` (模式 9) |
+| 3 | 偵測上下文問題 | `patterns-context-optimization.md` (第 5 節) |
+| 4 | 應用優化 | `patterns-context-optimization.md` (第 1-4, 6 節) |
+| 5 | 重新評估以測量影響 | `patterns-evaluation.md` (模式 6-7) |
 
-### Workflow 4: Regression Detection
+### 工作流程 4：回歸偵測
 
-For comparing agent versions and finding regressions.
+適用於比較代理版本並尋找回歸 (Regression)。
 
-| Step | Action | Reference Files |
+| 步驟 | 動作 | 參考文件 |
 |------|--------|-----------------|
-| 1 | Establish baseline | `patterns-evaluation.md` (Pattern 4: named runs) |
-| 2 | Run current version | `patterns-evaluation.md` (Pattern 1) |
-| 3 | Compare metrics | `patterns-evaluation.md` (Patterns 6-7) |
-| 4 | Analyze failing traces | `patterns-trace-analysis.md` (Pattern 7) |
-| 5 | Debug specific failures | `patterns-trace-analysis.md` (Patterns 8-9) |
+| 1 | 建立基準 (Baseline) | `patterns-evaluation.md` (模式 4：具名執行) |
+| 2 | 執行當前版本 | `patterns-evaluation.md` (模式 1) |
+| 3 | 比較指標 | `patterns-evaluation.md` (模式 6-7) |
+| 4 | 分析失敗的追蹤 | `patterns-trace-analysis.md` (模式 7) |
+| 5 | 除錯特定失敗 | `patterns-trace-analysis.md` (模式 8-9) |
 
-### Workflow 5: Custom Scorer Development
+### 工作流程 5：自訂評分器開發
 
-For creating project-specific evaluation metrics.
+適用於建立專案特定的評估指標。
 
-| Step | Action | Reference Files |
+| 步驟 | 動作 | 參考文件 |
 |------|--------|-----------------|
-| 1 | Understand scorer interface | `CRITICAL-interfaces.md` (Scorer section) |
-| 2 | Choose scorer pattern | `patterns-scorers.md` (Patterns 4-11) |
-| 3 | For multi-agent scorers | `patterns-scorers.md` (Patterns 13-16) |
-| 4 | Test with evaluation | `patterns-evaluation.md` (Pattern 1) |
+| 1 | 了解評分器介面 | `CRITICAL-interfaces.md` (評分器部分) |
+| 2 | 選擇評分器模式 | `patterns-scorers.md` (模式 4-11) |
+| 3 | 用於多代理評分器 | `patterns-scorers.md` (模式 13-16) |
+| 4 | 透過評估進行測試 | `patterns-evaluation.md` (模式 1) |
 
-## Reference Files Quick Lookup
+## 參考文件快速查詢
 
-| Reference | Purpose | When to Read |
+| 參考 | 用途 | 何時閱讀 |
 |-----------|---------|--------------|
-| `GOTCHAS.md` | Common mistakes | **Always read first** before writing code |
-| `CRITICAL-interfaces.md` | API signatures, schemas | When writing any evaluation code |
-| `patterns-evaluation.md` | Running evals, comparing | When executing evaluations |
-| `patterns-scorers.md` | Custom scorer creation | When built-in scorers aren't enough |
-| `patterns-datasets.md` | Dataset building | When preparing evaluation data |
-| `patterns-trace-analysis.md` | Trace debugging | When analyzing agent behavior |
-| `patterns-context-optimization.md` | Token/latency fixes | When agent is slow or expensive |
-| `user-journeys.md` | High-level workflows | When starting a new evaluation project |
+| `GOTCHAS.md` | 常見錯誤 | **務必先閱讀**，在撰寫程式碼之前 |
+| `CRITICAL-interfaces.md` | API 簽章，Schemas | 撰寫任何評估程式碼時 |
+| `patterns-evaluation.md` | 執行評估，比較 | 執行評估時 |
+| `patterns-scorers.md` | 自訂評分器建立 | 當內建評分器不足時 |
+| `patterns-datasets.md` | 資料集建立 | 準備評估資料時 |
+| `patterns-trace-analysis.md` | 追蹤除錯 | 分析代理行為時 |
+| `patterns-context-optimization.md` | Token/延遲修復 | 當代理緩慢或昂貴時 |
+| `user-journeys.md` | 高層級工作流程 | 開始新評估專案時 |
 
-## Critical API Facts
+## 關鍵 API 事實
 
-- **Use:** `mlflow.genai.evaluate()` (NOT `mlflow.evaluate()`)
-- **Data format:** `{"inputs": {"query": "..."}}` (nested structure required)
-- **predict_fn:** Receives `**unpacked kwargs` (not a dict)
+- **使用：** `mlflow.genai.evaluate()` (不是 `mlflow.evaluate()`)
+- **資料格式：** `{"inputs": {"query": "..."}}` (需要巢狀結構)
+- **predict_fn:** 接收 `**unpacked kwargs` (不是字典)
 
-See `GOTCHAS.md` for complete list.
+完整列表請見 `GOTCHAS.md`。

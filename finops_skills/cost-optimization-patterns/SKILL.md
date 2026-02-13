@@ -9,6 +9,24 @@ description: 提供詳細的模式和策略，用於識別和實施基於 FinOps
 
 本文件提供詳細的模式和策略，用於識別和實施基於 FinOps 最佳實踐的 Azure 成本優化機會。
 
+## 🤖 聊天機器人問答映射 (Chatbot QA Mapping)
+
+下表協助 Assistant 將使用者的自然語言提問映射至特定的優化模式：
+
+| 使用者提問 (User Question) | 相關模式 | 查詢代碼 |
+| :--- | :--- | :--- |
+| "我有閒置的資源嗎？", "哪些 VM 沒在用？" | **閒置資源消除** | `Pattern 3.1` |
+| "有些快照是不是沒在用了？", "如何清理孤兒資源？" | **孤兒資源 (快照/磁碟)** | `Pattern 3.2` |
+| "我的 VM 規格是不是開太大了？", "調整規模能省多少？" | **調整資源規模 (Right-sizing)** | `Pattern 1.1` |
+| "Databricks 叢集成本太高怎麼辦？" | **Databricks 叢集優化** | `Pattern 1.2` |
+| "我們是否用了舊款 VM？", "升級 VM 能省錢嗎？" | **VM 世代現代化** | `Pattern 1.3` |
+| "Databricks 作業要在哪種叢集跑？" | **Databricks 工作負載對齊** | `Pattern 1.4` |
+| "應該買 RI 嗎？", "隨選成本太高了" | **保留實例覆蓋率** | `Pattern 2.1` |
+| "非生產環境週末可以關機嗎？" | **排程與自動化** | `Pattern 6.1` |
+| "儲存成本怎麼降？", "資料可以放 Cold Tier 嗎？" | **儲存優化** | `Pattern 4.1` |
+| "非生產環境需要 GRS 嗎？" | **儲存冗餘優化** | `Pattern 4.2` |
+| "幫我檢查所有的優化機會" | **綜合優化機會摘要** | `Summary Query` |
+
 ---
 
 ## 🎯 優化類別
@@ -125,6 +143,90 @@ ORDER BY month DESC, monthly_cost DESC
 
 ---
 
+### 模式 1.3：VM 世代與 DBU 綜合優化 (VM & DBU Optimization)
+
+**目標**：識別舊世代 (Legacy) VM，但需綜合考量 Databricks DBU 費率與 Spot 實例的可用性 (Availability)
+
+```sql
+-- 識別舊世代 VM，並區分 Databricks 與一般 IaaS
+SELECT 
+  ResourceGroup,
+  ResourceName,
+  MeterName,
+  ConsumedService,
+  Location,
+  SUM(CostInBillingCurrency) AS monthly_vm_cost,
+  -- 判斷是否為 Spot 實例
+  MAX(CASE WHEN MeterName LIKE '%Spot%' OR CostInBillingCurrency < 0.1 THEN 1 ELSE 0 END) AS is_spot,
+  CASE 
+    -- Databricks 特殊邏輯：需考慮 DBU 加乘與 Spot 穩定性
+    WHEN ConsumedService = 'Microsoft.Databricks' AND MeterName LIKE '%v3%' 
+      THEN 'v3 為舊世代，但在 Spot 模式下可能具有較佳的回收率 (Eviction Rate)，請謹慎評估'
+    WHEN ConsumedService = 'Microsoft.Databricks' AND MeterName LIKE '%v4%' 
+      THEN 'v4 目前為 Databricks 主流，若非效能瓶頸可維持現狀 (v5 DBU 可能較高)'
+    
+    -- 一般 IaaS VM 邏輯：追求性價比
+    WHEN ConsumedService = 'Microsoft.Compute' AND MeterName LIKE '%v3%' 
+      THEN '建議升級至 v5 (性價比提升 ~20%)'
+    WHEN ConsumedService = 'Microsoft.Compute' AND MeterName LIKE '%v4%' 
+      THEN '考慮升級至 v5'
+    ELSE '檢閱'
+  END AS recommendation
+FROM develop_catalog.system_report.infra_azure_cost_silver
+WHERE year_month >= DATE_FORMAT(DATE_SUB(CURRENT_DATE(), 30), 'yyyy-MM')
+  AND (ConsumedService = 'Microsoft.Compute' OR ConsumedService = 'Microsoft.Databricks')
+  AND (MeterName LIKE '%v3%' OR MeterName LIKE '%v4%') 
+GROUP BY ResourceGroup, ResourceName, MeterName, ConsumedService, Location
+HAVING monthly_vm_cost > 50
+ORDER BY monthly_vm_cost DESC
+```
+
+**行動項目**：
+* **Databricks**：升級前務必計算 `(VM 價格 + DBU 價格)` 的總成本，v5 的 DBU 係數可能較高。
+* **Spot 策略**：舊世代 VM (如 v3/v4) 在某些區域的 Spot 容量池 (Capacity Pool) 可能較充裕，若工作負載對中斷敏感，可優先保留舊世代 Spot。
+* **一般 VM**：若非 Databricks 節點，原則上 v5 比 v4/v3 更便宜且快。
+
+---
+
+### 模式 1.4：Databricks 工作負載對齊
+
+**目標**：識別在昂貴的互動式 (Interactive/All-Purpose) 叢集上運行的自動化作業
+
+```sql
+-- 分析 Databricks 叢集類型使用比例
+WITH cluster_stats AS (
+  SELECT 
+    ResourceName, -- Workspace Name
+    SUM(CASE WHEN MeterName LIKE '%Interactive%' OR MeterName LIKE '%All-Purpose%' THEN CostInBillingCurrency ELSE 0 END) AS interactive_cost,
+    SUM(CASE WHEN MeterName LIKE '%Jobs%' OR MeterName LIKE '%Automated%' THEN CostInBillingCurrency ELSE 0 END) AS jobs_cost,
+    SUM(CostInBillingCurrency) AS total_cost
+  FROM develop_catalog.system_report.infra_azure_cost_silver
+  WHERE year_month >= DATE_FORMAT(DATE_SUB(CURRENT_DATE(), 90), 'yyyy-MM')
+    AND ConsumedService = 'Microsoft.Databricks'
+  GROUP BY ResourceName
+)
+SELECT 
+  ResourceName,
+  ROUND(interactive_cost, 2) AS interactive_cost,
+  ROUND(jobs_cost, 2) AS jobs_cost,
+  ROUND(interactive_cost / NULLIF(total_cost, 0) * 100, 1) AS interactive_ratio_pct,
+  CASE 
+    WHEN interactive_cost / NULLIF(total_cost, 0) > 0.70 THEN '🔴 高互動式比例：請確認是否將 Jobs 跑在互動叢集'
+    WHEN interactive_cost / NULLIF(total_cost, 0) > 0.50 THEN '🟡 中互動式比例：檢閱開發習慣'
+    ELSE '✅ 比例健康'
+  END AS recommendation,
+  ROUND(interactive_cost * 0.40, 2) AS potential_savings_migration -- 假設遷移 50% 至 Jobs (Jobs 比 Interactive 便宜約 40-50%)
+FROM cluster_stats
+WHERE total_cost > 500
+ORDER BY interactive_ratio_pct DESC
+```
+
+**行動項目**：
+* 將定期排程的 Notebooks 遷移至 Databricks Jobs Compute
+* Jobs Compute 費率通常比 All-Purpose 低 40-50%
+
+---
+
 ## 2️⃣ 保留實例與節省方案
 
 ### 模式 2.1：保留實例覆蓋率分析
@@ -132,49 +234,48 @@ ORDER BY month DESC, monthly_cost DESC
 **目標**：識別適合購買保留實例的穩定工作負載
 
 ```sql
--- 分析保留實例覆蓋率和機會
-WITH reservation_analysis AS (
+-- 分析承諾覆蓋率 (Reserved + Savings Plan) 和機會
+WITH commitment_analysis AS (
   SELECT 
     ConsumedService,
-    ProductName,
-    ResourceLocation,
+    cost_category,
+    region_group,
     year_month AS month,
-    SUM(CASE WHEN is_reservation THEN CostInBillingCurrency ELSE 0 END) AS reserved_cost,
-    SUM(CASE WHEN is_reservation THEN 0 ELSE CostInBillingCurrency END) AS on_demand_cost,
-    SUM(CostInBillingCurrency) AS total_cost,
-    COUNT(DISTINCT ResourceName) AS resource_count
-  FROM develop_catalog.system_report.infra_azure_cost_silver
+    SUM(reservation_cost + savingplan_cost) AS commitment_cost,
+    SUM(on_demand_cost) AS on_demand_cost,
+    SUM(total_cost) AS total_cost
+  FROM develop_catalog.system_report.finops_daily_cost_summary
   WHERE year_month >= DATE_FORMAT(DATE_SUB(CURRENT_DATE(), 180), 'yyyy-MM')
     AND cost_category IN ('Compute', 'Database')
-  GROUP BY ConsumedService, ProductName, ResourceLocation, month
+  GROUP BY ConsumedService, cost_category, region_group, month
 )
 SELECT 
   ConsumedService,
-  ProductName,
-  ResourceLocation,
+  cost_category,
+  region_group,
   AVG(on_demand_cost) AS avg_monthly_on_demand,
-  AVG(reserved_cost) AS avg_monthly_reserved,
+  AVG(commitment_cost) AS avg_monthly_commitment,
   AVG(total_cost) AS avg_monthly_total,
-  ROUND(AVG(reserved_cost) / NULLIF(AVG(total_cost), 0) * 100, 2) AS current_reservation_pct,
+  ROUND(AVG(commitment_cost) / NULLIF(AVG(total_cost), 0) * 100, 2) AS current_coverage_pct,
   ROUND(AVG(on_demand_cost) * 0.30, 2) AS potential_monthly_savings_30pct,
   ROUND(AVG(on_demand_cost) * 0.30 * 12, 2) AS potential_annual_savings,
   CASE 
-    WHEN AVG(on_demand_cost) > 1000 AND AVG(reserved_cost) / NULLIF(AVG(total_cost), 0) < 0.5 
+    WHEN AVG(on_demand_cost) > 1000 AND AVG(commitment_cost) / NULLIF(AVG(total_cost), 0) < 0.5 
       THEN '高優先級：大量隨選支出'
     WHEN AVG(on_demand_cost) > 500 
-      THEN '中優先級：考慮保留實例'
+      THEN '中優先級：考慮增加承諾'
     ELSE '低優先級：成本較低'
   END AS priority
-FROM reservation_analysis
-GROUP BY ConsumedService, ProductName, ResourceLocation
+FROM commitment_analysis
+GROUP BY ConsumedService, cost_category, region_group
 HAVING AVG(on_demand_cost) > 100
 ORDER BY potential_annual_savings DESC
 ```
 
 **行動項目**：
-* 針對穩定工作負載購買 1 年或 3 年保留實例
-* 保留實例通常可節省 30-70%
-* 優先處理高成本、穩定的資源
+* 針對穩定工作負載購買保留實例 (RI) 或節省方案 (Savings Plan)
+* 承諾使用通常可節省 30-70%
+* 目標覆蓋率：穩定負載應達 80% 以上
 
 ---
 
@@ -232,6 +333,35 @@ LIMIT 100
 
 ---
 
+### 模式 3.2：孤兒資源（長期快照與未連結磁碟）
+
+**目標**：識別長期存在但可能不再需要的快照或未連結磁碟
+
+```sql
+-- 尋找超過 90 天的快照
+SELECT 
+  ResourceGroup,
+  ResourceName,
+  MeterName,
+  SUM(CostInBillingCurrency) AS total_cost_90d,
+  ROUND(AVG(CostInBillingCurrency), 2) AS avg_daily_cost,
+  COUNT(DISTINCT date_key) AS billing_days
+FROM develop_catalog.system_report.infra_azure_cost_silver
+WHERE date_key >= CAST(DATE_FORMAT(DATE_SUB(CURRENT_DATE(), 90), 'yyyyMMdd') AS INT)
+  AND (ConsumedService = 'Microsoft.Compute' AND MeterName LIKE '%Snapshot%')
+GROUP BY ResourceGroup, ResourceName, MeterName
+HAVING billing_days >= 85 -- 持續計費接近 3 個月
+ORDER BY total_cost_90d DESC
+LIMIT 50;
+```
+
+**行動項目**：
+* 刪除超過 90 天的快照（除非有合規需求）
+* 確認磁碟 (Disks) 是否有對應的 VM，若無則刪除
+* 潛在節省：100% 的快照儲存成本
+
+---
+
 ## 4️⃣ 儲存優化
 
 ### 模式 4.1：儲存層級優化
@@ -283,6 +413,36 @@ ORDER BY potential_monthly_savings_40pct DESC
 * 實施生命週期管理政策
 * 刪除舊的快照和備份
 * 潛在節省：40-80%
+
+---
+
+### 模式 4.2：儲存冗餘優化 (GRS vs LRS)
+
+**目標**：識別非生產環境中不必要的異地備援 (GRS/RA-GRS) 儲存帳戶
+
+```sql
+-- 識別非生產環境的 GRS 儲存
+SELECT 
+  ResourceGroup,
+  ResourceName,
+  MeterName,
+  tag_environment,
+  SUM(CostInBillingCurrency) AS monthly_cost,
+  '建議降級至 LRS (本地備援)' AS recommendation,
+  ROUND(SUM(CostInBillingCurrency) * 0.40, 2) AS potential_savings -- GRS 到 LRS 約省 40-50%
+FROM develop_catalog.system_report.infra_azure_cost_silver
+WHERE year_month >= DATE_FORMAT(DATE_SUB(CURRENT_DATE(), 30), 'yyyy-MM')
+  AND ConsumedService = 'Microsoft.Storage'
+  AND (MeterName LIKE '%GRS%' OR MeterName LIKE '%Geo-Redundant%')
+  AND (tag_environment IN ('dev', 'test', 'qa') OR ResourceGroup LIKE '%dev%' OR ResourceGroup LIKE '%test%')
+GROUP BY ResourceGroup, ResourceName, MeterName, tag_environment
+HAVING monthly_cost > 20
+ORDER BY monthly_cost DESC
+```
+
+**行動項目**：
+* 將 Dev/Test 環境的儲存帳戶複寫設定由 GRS 改為 LRS
+* 潛在節省：40-50% 的儲存成本
 
 ---
 
@@ -342,11 +502,12 @@ WITH non_prod_resources AS (
     ConsumedService,
     tag_environment,
     ProductName,
-    DATE_FORMAT(Date, 'yyyy-MM') AS month,
+    ProductName,
+    year_month AS month,
     SUM(CostInBillingCurrency) AS monthly_cost,
-    COUNT(DISTINCT CAST(Date AS DATE)) AS days_active
+    COUNT(DISTINCT date_key) AS days_active
   FROM develop_catalog.system_report.infra_azure_cost_silver
-  WHERE Date >= DATE_SUB(CURRENT_DATE(), 60)
+  WHERE year_month >= DATE_FORMAT(DATE_SUB(CURRENT_DATE(), 60), 'yyyy-MM')
     AND cost_category = 'Compute'
     AND (tag_environment IN ('dev', 'test', 'qa', 'staging')
          OR ResourceGroup LIKE '%dev%'
@@ -386,7 +547,7 @@ SELECT
   ROUND(SUM(CostInBillingCurrency) * 0.30, 2) AS potential_savings,
   '30%' AS savings_rate
 FROM develop_catalog.system_report.infra_azure_cost_silver
-WHERE Date >= DATE_SUB(CURRENT_DATE(), 30)
+WHERE date_key >= CAST(DATE_FORMAT(DATE_SUB(CURRENT_DATE(), 30), 'yyyyMMdd') AS INT)
   AND cost_category = 'Compute'
   AND Quantity / 24 < 0.5  -- 低利用率
 
@@ -399,9 +560,36 @@ SELECT
   ROUND(SUM(CostInBillingCurrency) * 0.40, 2) AS potential_savings,
   '40%' AS savings_rate
 FROM develop_catalog.system_report.infra_azure_cost_silver
-WHERE Date >= DATE_SUB(CURRENT_DATE(), 30)
+WHERE date_key >= CAST(DATE_FORMAT(DATE_SUB(CURRENT_DATE(), 30), 'yyyyMMdd') AS INT)
   AND cost_category IN ('Compute', 'Database')
   AND is_reservation = FALSE
+
+UNION ALL
+
+-- Spot 實例潛在節省 (針對非生產環境)
+SELECT 
+  'Spot Instances' AS optimization_category,
+  COUNT(DISTINCT ResourceName) AS affected_resources,
+  ROUND(SUM(CostInBillingCurrency), 2) AS current_monthly_cost,
+  ROUND(SUM(CostInBillingCurrency) * 0.60, 2) AS potential_savings,
+  '60%' AS savings_rate
+FROM develop_catalog.system_report.infra_azure_cost_silver
+WHERE date_key >= CAST(DATE_FORMAT(DATE_SUB(CURRENT_DATE(), 30), 'yyyyMMdd') AS INT)
+  AND cost_category = 'Compute'
+  AND (tag_environment IN ('dev', 'test', 'nonprod') OR ResourceGroup LIKE '%dev%')
+  AND is_reservation = FALSE -- 針對隨選實例
+
+UNION ALL
+
+SELECT 
+  '孤兒資源 (快照)' AS optimization_category,
+  COUNT(DISTINCT ResourceName) AS affected_resources,
+  ROUND(SUM(CostInBillingCurrency), 2) AS current_monthly_cost,
+  ROUND(SUM(CostInBillingCurrency), 2) AS potential_savings,
+  '100%' AS savings_rate
+FROM develop_catalog.system_report.infra_azure_cost_silver
+WHERE date_key >= CAST(DATE_FORMAT(DATE_SUB(CURRENT_DATE(), 30), 'yyyyMMdd') AS INT)
+  AND (ConsumedService = 'Microsoft.Compute' AND MeterName LIKE '%Snapshot%')
 
 UNION ALL
 
@@ -412,9 +600,36 @@ SELECT
   ROUND(SUM(CostInBillingCurrency) * 0.90, 2) AS potential_savings,
   '90%' AS savings_rate
 FROM develop_catalog.system_report.infra_azure_cost_silver
-WHERE Date >= DATE_SUB(CURRENT_DATE(), 30)
+WHERE date_key >= CAST(DATE_FORMAT(DATE_SUB(CURRENT_DATE(), 30), 'yyyyMMdd') AS INT)
   AND Quantity = 0
   AND CostInBillingCurrency > 0
+
+UNION ALL
+
+SELECT 
+  'VM 世代現代化' AS optimization_category,
+  COUNT(DISTINCT ResourceName) AS affected_resources,
+  ROUND(SUM(CostInBillingCurrency), 2) AS current_monthly_cost,
+  ROUND(SUM(CostInBillingCurrency) * 0.15, 2) AS potential_savings,
+  '15%' AS savings_rate
+FROM develop_catalog.system_report.infra_azure_cost_silver
+WHERE date_key >= CAST(DATE_FORMAT(DATE_SUB(CURRENT_DATE(), 30), 'yyyyMMdd') AS INT)
+  AND ConsumedService = 'Microsoft.Compute'
+  AND (MeterName LIKE '%v3%' OR MeterName LIKE '%v4%')
+
+UNION ALL
+
+SELECT 
+  '儲存冗餘優化 (GRS->LRS)' AS optimization_category,
+  COUNT(DISTINCT ResourceName) AS affected_resources,
+  ROUND(SUM(CostInBillingCurrency), 2) AS current_monthly_cost,
+  ROUND(SUM(CostInBillingCurrency) * 0.40, 2) AS potential_savings,
+  '40%' AS savings_rate
+FROM develop_catalog.system_report.infra_azure_cost_silver
+WHERE date_key >= CAST(DATE_FORMAT(DATE_SUB(CURRENT_DATE(), 30), 'yyyyMMdd') AS INT)
+  AND ConsumedService = 'Microsoft.Storage'
+  AND (MeterName LIKE '%GRS%' OR MeterName LIKE '%Geo-Redundant%')
+  AND (tag_environment IN ('dev', 'test', 'qa') OR ResourceGroup LIKE '%dev%')
 
 ORDER BY potential_savings DESC
 ```
@@ -425,10 +640,14 @@ ORDER BY potential_savings DESC
 
 | 優化類型 | 實施難度 | 潛在節省 | 優先級 |
 |---------|---------|---------|--------|
+| 孤兒資源 (快照/磁碟) | 低 | 100% | 🔴 高 |
 | 閒置資源消除 | 低 | 90%+ | 🔴 高 |
+| 儲存冗餘優化 (GRS) | 低 | 40-50% | 🔴 高 |
 | 非生產環境排程 | 低 | 60-75% | 🔴 高 |
+| Databricks 工作負載 | 中 | 40% | 🟡 中 |
 | 保留實例 | 中 | 30-70% | 🟡 中 |
 | 調整資源規模 | 中 | 20-50% | 🟡 中 |
+| VM 世代現代化 | 中 | 15% | 🟡 中 |
 | 儲存層級優化 | 中 | 40-80% | 🟡 中 |
 | 網路優化 | 高 | 30-60% | 🟢 低 |
 

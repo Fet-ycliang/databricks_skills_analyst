@@ -1,31 +1,31 @@
 ---
 name: metric-views
-description: "Unity Catalog metric views: define, create, query, and manage governed business metrics in YAML. Use when building standardized KPIs, revenue metrics, order analytics, or any reusable business metrics that need consistent definitions across teams and tools."
+description: "Unity Catalog Metric Views: 使用 YAML 定義、建立、查詢和管理受治理的業務指標。用於建構標準化 KPI、收入指標、訂單分析，或任何需要在團隊和工具之間保持一致定義的可重複使用業務指標。"
 ---
 
 # Unity Catalog Metric Views
 
-Define reusable, governed business metrics in YAML that separate measure definitions from dimension groupings for flexible querying.
+使用 YAML 定義可重複使用、受治理的業務指標，將度量定義與維度分組分離，以實現靈活的查詢。
 
-## When to Use
+## 何時使用
 
-Use this skill when:
-- Defining **standardized business metrics** (revenue, order counts, conversion rates)
-- Building **KPI layers** shared across dashboards, Genie, and SQL queries
-- Creating metrics with **complex aggregations** (ratios, distinct counts, filtered measures)
-- Defining **window measures** (moving averages, running totals, period-over-period, YTD)
-- Modeling **star or snowflake schemas** with joins in metric definitions
-- Enabling **materialization** for pre-computed metric aggregations
+當您需要以下功能時，請使用此技能：
+- 定義 **標準化業務指標** (收入、訂單計數、轉換率)
+- 建構跨儀表板、Genie 和 SQL 查詢共用的 **KPI 層**
+- 建立具有 **複雜聚合** (比率、不重複計數、過濾後的度量) 的指標
+- 定義 **視窗度量** (移動平均、累計總和、期間比較、年初至今)
+- 模型化 **星狀或雪花架構**，並在指標定義中包含聯結
+- 啟用 **具體化 (Materialization)** 以預先計算指標聚合
 
-## Prerequisites
+## 先決條件
 
-- **Databricks Runtime 17.2+** (for YAML version 1.1)
-- SQL warehouse with `CAN USE` permissions
-- `SELECT` on source tables, `CREATE TABLE` + `USE SCHEMA` in the target schema
+- **Databricks Runtime 17.2+** (適用於 YAML 1.1 版本)
+- 具有 `CAN USE` 權限的 SQL Warehouse
+- 來源資料表的 `SELECT` 權限，以及目標結構描述中的 `CREATE TABLE` + `USE SCHEMA` 權限
 
-## Quick Start
+## 快速開始
 
-### Create a Metric View
+### 建立 Metric View
 
 ```sql
 CREATE OR REPLACE VIEW catalog.schema.orders_metrics
@@ -59,9 +59,9 @@ AS $$
 $$
 ```
 
-### Query a Metric View
+### 查詢 Metric View
 
-All measures must use the `MEASURE()` function. `SELECT *` is NOT supported.
+所有度量必須使用 `MEASURE()` 函數。不支援 `SELECT *`。
 
 ```sql
 SELECT
@@ -75,27 +75,27 @@ GROUP BY ALL
 ORDER BY ALL
 ```
 
-## Reference Files
+## 參考檔案
 
-| Topic | File | Description |
+| 主題 | 檔案 | 描述 |
 |-------|------|-------------|
-| YAML Syntax | [yaml-reference.md](yaml-reference.md) | Complete YAML spec: dimensions, measures, joins, materialization |
-| Patterns & Examples | [patterns.md](patterns.md) | Common patterns: star schema, snowflake, filtered measures, window measures, ratios |
+| YAML 語法 | [yaml-reference.md](yaml-reference.md) | 完整的 YAML 規範：維度、度量、聯結、具體化 |
+| 模式與範例 | [patterns.md](patterns.md) | 常見模式：星狀架構、雪花架構、過濾後的度量、視窗度量、比率 |
 
-## MCP Tools
+## MCP 工具
 
-Use the `manage_metric_views` tool for all metric view operations:
+使用 `manage_metric_views` 工具進行所有 Metric View 操作：
 
-| Action | Description |
+| 動作 | 描述 |
 |--------|-------------|
-| `create` | Create a metric view with dimensions and measures |
-| `alter` | Update a metric view's YAML definition |
-| `describe` | Get the full definition and metadata |
-| `query` | Query measures grouped by dimensions |
-| `drop` | Drop a metric view |
-| `grant` | Grant SELECT privileges to users/groups |
+| `create` | 建立包含維度和度量的 Metric View |
+| `alter` | 更新 Metric View 的 YAML 定義 |
+| `describe` | 獲取完整的定義和詮釋資料 |
+| `query` | 查詢依維度分組的度量 |
+| `drop` | 刪除 Metric View |
+| `grant` | 授予使用者/群組 SELECT 權限 |
 
-### Create via MCP
+### 透過 MCP 建立
 
 ```python
 manage_metric_views(
@@ -116,7 +116,7 @@ manage_metric_views(
 )
 ```
 
-### Query via MCP
+### 透過 MCP 查詢
 
 ```python
 manage_metric_views(
@@ -130,7 +130,7 @@ manage_metric_views(
 )
 ```
 
-### Describe via MCP
+### 透過 MCP 描述
 
 ```python
 manage_metric_views(
@@ -139,7 +139,7 @@ manage_metric_views(
 )
 ```
 
-### Grant Access
+### 授予權限
 
 ```python
 manage_metric_views(
@@ -150,76 +150,76 @@ manage_metric_views(
 )
 ```
 
-## YAML Spec Quick Reference
+## YAML 規範快速參考
 
 ```yaml
-version: 1.1                    # Required: "1.1" for DBR 17.2+
-comment: "Description"          # Optional: metric view description
-source: catalog.schema.table    # Required: source table/view
-filter: column > value          # Optional: global WHERE filter
+version: 1.1                    # 必要: DBR 17.2+ 使用 "1.1"
+comment: "Description"          # 選用: Metric View 描述
+source: catalog.schema.table    # 必要: 來源資料表/視圖
+filter: column > value          # 選用: 全域 WHERE 過濾器
 
-dimensions:                     # Required: at least one
-  - name: Display Name          # Backtick-quoted in queries
-    expr: sql_expression        # Column ref or SQL transformation
-    comment: "Description"      # Optional (v1.1+)
+dimensions:                     # 必要: 至少一個
+  - name: Display Name          # 在查詢中使用反引號引用
+    expr: sql_expression        # 欄位參考或 SQL 轉換
+    comment: "Description"      # 選用 (v1.1+)
 
-measures:                       # Required: at least one
-  - name: Display Name          # Queried via MEASURE(`name`)
-    expr: AGG_FUNC(column)      # Must be an aggregate expression
-    comment: "Description"      # Optional (v1.1+)
+measures:                       # 必要: 至少一個
+  - name: Display Name          # 透過 MEASURE(`name`) 查詢
+    expr: AGG_FUNC(column)      # 必須是聚合表達式
+    comment: "Description"      # 選用 (v1.1+)
 
-joins:                          # Optional: star/snowflake schema
+joins:                          # 選用: 星狀/雪花架構
   - name: dim_table
     source: catalog.schema.dim_table
     on: source.fk = dim_table.pk
 
-materialization:                # Optional (experimental)
+materialization:                # 選用 (實驗性)
   schedule: every 6 hours
   mode: relaxed
 ```
 
-## Key Concepts
+## 關鍵概念
 
-### Dimensions vs Measures
+### 維度與度量
 
-| | Dimensions | Measures |
+| | 維度 (Dimensions) | 度量 (Measures) |
 |---|---|---|
-| **Purpose** | Categorize and group data | Aggregate numeric values |
-| **Examples** | Region, Date, Status | SUM(revenue), COUNT(orders) |
-| **In queries** | Used in SELECT and GROUP BY | Wrapped in `MEASURE()` |
-| **SQL expressions** | Any SQL expression | Must use aggregate functions |
+| **目的** | 對資料進行分類和分組 | 聚合數值 |
+| **範例** | 地區、日期、狀態 | SUM(revenue), COUNT(orders) |
+| **在查詢中** | 用於 SELECT 和 GROUP BY | 包裝在 `MEASURE()` 中 |
+| **SQL 表達式** | 任何 SQL 表達式 | 必須使用聚合函數 |
 
-### Why Metric Views vs Standard Views?
+### 為何使用 Metric Views 與標準 Views？
 
-| Feature | Standard Views | Metric Views |
+| 功能 | 標準 Views | Metric Views |
 |---------|---------------|--------------|
-| Aggregation locked at creation | Yes | No - flexible at query time |
-| Safe re-aggregation of ratios | No | Yes |
-| Star/snowflake schema joins | Manual | Declarative in YAML |
-| Materialization | Separate MV needed | Built-in |
-| AI/BI Genie integration | Limited | Native |
+| 建立時鎖定聚合 | 是 | 否 - 查詢時靈活聚合 |
+| 比率的安全重新聚合 | 否 | 是 |
+| 星狀/雪花架構聯結 | 手動 | 在 YAML 中宣告 |
+| 具體化 | 需要單獨的 MV | 內建 |
+| AI/BI Genie 整合 | 有限 | 原生支援 |
 
-## Common Issues
+## 常見問題
 
-| Issue | Solution |
+| 問題 | 解決方案 |
 |-------|----------|
-| **SELECT * not supported** | Must explicitly list dimensions and use MEASURE() for measures |
-| **"Cannot resolve column"** | Dimension/measure names with spaces need backtick quoting |
-| **JOIN at query time fails** | Joins must be in the YAML definition, not in the SELECT query |
-| **MEASURE() required** | All measure references must be wrapped: `MEASURE(\`name\`)` |
-| **DBR version error** | Requires Runtime 17.2+ for YAML v1.1, or 16.4+ for v0.1 |
-| **Materialization not working** | Requires serverless compute enabled; currently experimental |
+| **不支援 SELECT *** | 必須明確列出維度並對度量使用 MEASURE() |
+| **"Cannot resolve column"** | 包含空格的維度/度量名稱需要反引號引用 |
+| **查詢時 JOIN 失敗** | 聯結必須在 YAML 定義中，而不是在 SELECT 查詢中 |
+| **需要 MEASURE()** | 所有度量參考必須被包裝：`MEASURE(\`name\`)` |
+| **DBR 版本錯誤** | YAML v1.1 需要 Runtime 17.2+，v0.1 需要 16.4+ |
+| **具體化無法運作** | 需要啟用 Serverless Compute；目前為實驗性功能 |
 
-## Integrations
+## 整合
 
-Metric views work natively with:
-- **AI/BI Dashboards** - Use as datasets for visualizations
-- **AI/BI Genie** - Natural language querying of metrics
-- **Alerts** - Set threshold-based alerts on measures
-- **SQL Editor** - Direct SQL querying with MEASURE()
-- **Catalog Explorer UI** - Visual creation and browsing
+Metric Views 原生支援下列工具：
+- **AI/BI Dashboards** - 作為視覺化的資料集
+- **AI/BI Genie** - 指標的自然語言查詢
+- **Alerts** - 對度量設定基於閾值的警報
+- **SQL Editor** - 使用 MEASURE() 直接進行 SQL 查詢
+- **Catalog Explorer UI** - 視覺化建立和瀏覽
 
-## Resources
+## 資源
 
 - [Metric Views Documentation](https://docs.databricks.com/en/metric-views/)
 - [YAML Syntax Reference](https://docs.databricks.com/en/metric-views/data-modeling/syntax)

@@ -1,58 +1,58 @@
-# Metric View YAML Reference
+# Metric View YAML 參考 (Metric View YAML Reference)
 
-Complete reference for the YAML specification used in Unity Catalog metric views.
+Unity Catalog Metric Views 使用的 YAML 規範完整參考。
 
-## Top-Level Fields
+## 頂層欄位
 
-| Field | Required | Type | Description |
+| 欄位 | 必要 | 類型 | 描述 |
 |-------|----------|------|-------------|
-| `version` | No | string | YAML spec version. `"1.1"` for DBR 17.2+, `"0.1"` for DBR 16.4-17.1. Defaults to `1.1`. |
-| `source` | Yes | string | Source table, view, or SQL query in three-level namespace format. |
-| `comment` | No | string | Description of the metric view (v1.1+). |
-| `filter` | No | string | SQL boolean expression applied as a global WHERE clause. |
-| `dimensions` | Yes | list | Array of dimension definitions (at least one). |
-| `measures` | Yes | list | Array of measure definitions (at least one). |
-| `joins` | No | list | Star/snowflake schema join definitions. |
-| `materialization` | No | object | Pre-computation configuration (experimental). |
+| `version` | 否 | string | YAML 規範版本。DBR 17.2+ 為 `"1.1"`，DBR 16.4-17.1 為 `"0.1"`。預設為 `1.1`。|
+| `source` | 是 | string | 三層命名空間格式的來源資料表、視圖或 SQL 查詢。 |
+| `comment` | 否 | string | Metric View 的描述 (v1.1+)。 |
+| `filter` | 否 | string | 作為全域 WHERE 子句應用的 SQL 布林表達式。 |
+| `dimensions` | 是 | list | 維度定義陣列 (至少一個)。 |
+| `measures` | 是 | list | 度量定義陣列 (至少一個)。 |
+| `joins` | 否 | list | 星狀/雪花架構聯結定義。 |
+| `materialization` | 否 | object | 預先計算配置 (實驗性)。 |
 
-## Dimensions
+## 維度 (Dimensions)
 
-Dimensions define the categorical attributes used to group and filter data.
+維度定義用於分組和過濾資料的分類屬性。
 
 ```yaml
 dimensions:
-  - name: Region               # Display name, backtick-quoted in queries
-    expr: region_name           # Direct column reference
-    comment: "Sales region"     # Optional description (v1.1+)
+  - name: Region               # 顯示名稱，查詢中使用反引號引用
+    expr: region_name           # 直接欄位參考
+    comment: "Sales region"     # 選用描述 (v1.1+)
 
   - name: Order Month
-    expr: DATE_TRUNC('MONTH', order_date)  # SQL transformation
+    expr: DATE_TRUNC('MONTH', order_date)  # SQL 轉換
 
   - name: Order Year
-    expr: EXTRACT(YEAR FROM `Order Month`)  # Can reference other dimensions
+    expr: EXTRACT(YEAR FROM `Order Month`)  # 可以參考其他維度
 
   - name: Customer Type
     expr: CASE
       WHEN customer_tier = 'A' THEN 'Enterprise'
       WHEN customer_tier = 'B' THEN 'Mid-Market'
       ELSE 'SMB'
-      END                      # Multi-line CASE expressions supported
+      END                      # 支援多行 CASE 表達式
 
   - name: Nation
-    expr: customer.c_name      # Reference joined table columns
+    expr: customer.c_name      # 參考聯結資料表的欄位
 ```
 
-### Dimension Rules
+### 維度規則
 
-- `name` is required and becomes the column name in queries (backtick-quoted if it has spaces)
-- `expr` is required and must be a valid SQL expression
-- Can reference source columns, SQL functions, CASE expressions, and other dimensions
-- Can reference columns from joined tables using `join_name.column_name`
-- Cannot use aggregate functions (those belong in measures)
+- `name` 是必要的，並成為查詢中的欄位名稱 (若包含空格需用反引號引用)
+- `expr` 是必要的，且必須是有效的 SQL 表達式
+- 可以參考來源欄位、SQL 函數、CASE 表達式和其他維度
+- 可以使用 `join_name.column_name` 參考聯結資料表中的欄位
+- 不能使用聚合函數 (那些屬於度量)
 
-## Measures
+## 度量 (Measures)
 
-Measures define aggregated values computed at query time.
+度量定義在查詢時計算的聚合值。
 
 ```yaml
 measures:
@@ -69,57 +69,57 @@ measures:
   - name: Unique Customers
     expr: COUNT(DISTINCT customer_id)
 
-  - name: Revenue per Customer           # Ratio measure
+  - name: Revenue per Customer           # 比率度量
     expr: SUM(total_price) / COUNT(DISTINCT customer_id)
 
-  - name: Open Order Revenue             # Filtered measure
+  - name: Open Order Revenue             # 過濾後的度量
     expr: SUM(total_price) FILTER (WHERE status = 'O')
     comment: "Revenue from open orders only"
 
-  - name: Open Revenue per Customer      # Filtered ratio
+  - name: Open Revenue per Customer      # 過濾後的比率
     expr: SUM(total_price) FILTER (WHERE status = 'O') / COUNT(DISTINCT customer_id) FILTER (WHERE status = 'O')
 ```
 
-### Window Measures (Experimental)
+### 視窗度量 (實驗性)
 
-Add a `window` block to a measure for windowed, cumulative, or semiadditive aggregations. See [Window Measures Documentation](https://docs.databricks.com/aws/en/metric-views/data-modeling/window-measures).
+在度量中新增 `window` 區塊以進行視窗化、累計或半可加聚合。請參閱 [Window Measures Documentation](https://docs.databricks.com/aws/en/metric-views/data-modeling/window-measures)。
 
 ```yaml
 measures:
   - name: Running Total
     expr: SUM(total_price)
     window:
-      - order: date              # Dimension that orders the window
-        range: cumulative        # Window extent (see range values below)
-        semiadditive: last       # How to summarize when order dim is not in GROUP BY
+      - order: date              # 決定視窗排序的維度
+        range: cumulative        # 視窗範圍 (見下方範圍值)
+        semiadditive: last       # 當排序維度不在 GROUP BY 中時如何匯總
 
   - name: 7-Day Customers
     expr: COUNT(DISTINCT customer_id)
     window:
       - order: date
-        range: trailing 7 day    # 7 days before current, EXCLUDING current day
+        range: trailing 7 day    # 當前日之前的 7 天，不包含當日
         semiadditive: last
 ```
 
-**Window range values:**
+**視窗範圍值：**
 
-| Range | Description |
+| 範圍 (Range) | 描述 |
 |-------|-------------|
-| `current` | Only rows matching the current ordering value |
-| `cumulative` | All rows up to and including the current row |
-| `trailing <N> <unit>` | N units before current row (excludes current) |
-| `leading <N> <unit>` | N units after current row |
-| `all` | All rows |
+| `current` | 僅匹配當前排序值的資料列 |
+| `cumulative` | 直至並包含當前列的所有資料列 |
+| `trailing <N> <unit>` | 當前列之前的 N 個單位 (不包含當前列) |
+| `leading <N> <unit>` | 當前列之後的 N 個單位 |
+| `all` | 所有資料列 |
 
-**Window spec fields:**
+**視窗規範欄位：**
 
-| Field | Required | Description |
+| 欄位 | 必要 | 描述 |
 |-------|----------|-------------|
-| `order` | Yes | Dimension name that determines window ordering |
-| `range` | Yes | Window extent (see values above) |
-| `semiadditive` | Yes | `first` or `last` - value to use when order dimension is absent from GROUP BY |
+| `order` | 是 | 決定視窗排序的維度名稱 |
+| `range` | 是 | 視窗範圍 (見上表) |
+| `semiadditive` | 是 | `first` 或 `last` - 當排序維度不在 GROUP BY 中時使用的值 |
 
-**Multiple windows** can be composed on a single measure (e.g., for year-to-date):
+**多個視窗** 可以組合在單一度量上 (例如，用於年初至今)：
 
 ```yaml
   - name: ytd_sales
@@ -133,26 +133,26 @@ measures:
         semiadditive: last
 ```
 
-**Derived measures** can reference window measures using `MEASURE()`:
+**衍生度量** 可以使用 `MEASURE()` 參考視窗度量：
 
 ```yaml
   - name: day_over_day_growth
     expr: (MEASURE(current_day_sales) - MEASURE(previous_day_sales)) / MEASURE(previous_day_sales) * 100
 ```
 
-### Measure Rules
+### 度量規則
 
-- `name` is required and queried via `MEASURE(\`name\`)`
-- `expr` must contain an aggregate function (SUM, COUNT, AVG, MIN, MAX, etc.)
-- Supports `FILTER (WHERE ...)` for conditional aggregation
-- Supports ratios of aggregates
-- Derived measures can reference other measures via `MEASURE()` (used with window measures)
-- Window measures use `version: 0.1` (experimental feature)
-- `SELECT *` on metric views is NOT supported; must use `MEASURE()` explicitly
+- `name` 是必要的，並透過 `MEASURE(\`name\`)` 查詢
+- `expr` 必須包含聚合函數 (SUM, COUNT, AVG, MIN, MAX 等)
+- 支援 `FILTER (WHERE ...)` 進行條件聚合
+- 支援聚合的比率
+- 衍生度量可以透過 `MEASURE()` 參考其他度量 (與視窗度量一起使用)
+- 視窗度量使用 `version: 0.1` (實驗性功能)
+- 不支援 `SELECT *`；必須明確使用 `MEASURE()`
 
-## Joins
+## 聯結 (Joins)
 
-### Star Schema (Single Level)
+### 星狀架構 (單層)
 
 ```yaml
 source: catalog.schema.fact_orders
@@ -166,7 +166,7 @@ joins:
     on: source.product_id = product.id
 ```
 
-### Star Schema with USING
+### 使用 USING 的星狀架構
 
 ```yaml
 joins:
@@ -177,7 +177,7 @@ joins:
       - region_id
 ```
 
-### Snowflake Schema (Nested Joins, DBR 17.1+)
+### 雪花架構 (巢狀聯結, DBR 17.1+)
 
 ```yaml
 source: catalog.schema.orders
@@ -195,44 +195,44 @@ joins:
             on: nation.region_id = region.id
 ```
 
-### Join Rules
+### 聯結規則
 
-- `name` is required and used to reference joined columns: `name.column`
-- `source` is the fully qualified table/view name
-- Use either `on` (expression) or `using` (column list), not both
-- In `on`, reference the fact table as `source` and join tables by their `name`
-- Nested `joins` create snowflake schema (requires DBR 17.1+)
-- Joined tables cannot include MAP type columns
+- `name` 是必要的，用於參考聯結欄位：`name.column`
+- `source` 是全限定的資料表/視圖名稱
+- 使用 `on` (表達式) 或 `using` (欄位列表)，兩者擇一
+- 在 `on` 中，將事實資料表參照為 `source`，並依其 `name` 參照聯結資料表
+- 巢狀 `joins` 建立雪花架構 (需要 DBR 17.1+)
+- 聯結的資料表不能包含 MAP 類型的欄位
 
-## Filter
+## 過濾器 (Filter)
 
-A global filter applied to all queries as a WHERE clause.
+作為 WHERE 子句應用於所有查詢的全域過濾器。
 
 ```yaml
 filter: order_date > '2020-01-01'
 
-# Multiple conditions
+# 多個條件
 filter: order_date > '2020-01-01' AND status != 'CANCELLED'
 
-# Using joined columns
+# 使用聯結欄位
 filter: customer.active = true
 ```
 
-## Materialization (Experimental)
+## 具體化 (Materialization) (實驗性)
 
-Pre-compute aggregations for faster query performance. Uses Lakeflow Spark Declarative Pipelines under the hood.
+預先計算聚合以加快查詢效能。底層使用 Lakeflow Spark Declarative Pipelines。
 
 ```yaml
 materialization:
-  schedule: every 6 hours           # Same syntax as MV schedule clause
-  mode: relaxed                     # Only "relaxed" supported currently
+  schedule: every 6 hours           # 與 MV schedule 子句語法相同
+  mode: relaxed                     # 目前僅支援 "relaxed"
 
   materialized_views:
     - name: baseline
-      type: unaggregated            # Full unaggregated data model
-
+      type: unaggregated            # 完整的未聚合資料模型
+    
     - name: revenue_breakdown
-      type: aggregated              # Pre-computed aggregation
+      type: aggregated              # 預先計算的聚合
       dimensions:
         - category
         - region
@@ -248,31 +248,31 @@ materialization:
         - total_revenue
 ```
 
-### Materialization Types
+### 具體化類型
 
-| Type | Description | When to Use |
+| 類型 | 描述 | 何時使用 |
 |------|-------------|-------------|
-| `unaggregated` | Materializes full data model (source + joins + filter) | Expensive source views or many joins |
-| `aggregated` | Pre-computes specific dimension/measure combos | Frequently queried combinations |
+| `unaggregated` | 具體化完整的資料模型 (來源 + 聯結 + 過濾器) | 昂貴的來源視圖或多個聯結 |
+| `aggregated` | 預先計算特定的維度/度量組合 | 經常查詢的組合 |
 
-### Materialization Requirements
+### 具體化需求
 
-- Serverless compute must be enabled
+- 必須啟用 Serverless Compute
 - Databricks Runtime 17.2+
-- `TRIGGER ON UPDATE` clause is not supported
-- Schedule uses same syntax as materialized view schedules
+- 不支援 `TRIGGER ON UPDATE` 子句
+- 排程使用與 Materialized View 排程相同的語法
 
-### Refresh Materialization
+### 重新整理具體化
 
 ```python
-# Find and refresh the pipeline
+# 尋找並重新整理管線
 from databricks.sdk import WorkspaceClient
 w = WorkspaceClient()
 pipeline_id = "your-pipeline-id"
 w.pipelines.start_update(pipeline_id)
 ```
 
-## Complete Example
+## 完整範例
 
 ```sql
 CREATE OR REPLACE VIEW catalog.schema.sales_metrics

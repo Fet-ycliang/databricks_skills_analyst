@@ -1,16 +1,16 @@
-# Custom PyFunc Models
+# 自訂 PyFunc 模型 (Custom PyFunc Models)
 
-Deploy custom Python models with preprocessing, postprocessing, or complex logic.
+部署具有預處理、後處理或複雜邏輯的自訂 Python 模型。
 
-## When to Use Custom PyFunc
+## 何時使用自訂 PyFunc
 
-- Custom preprocessing not captured in sklearn pipeline
-- Multiple models in one endpoint
-- Custom output formatting
-- External API calls during inference
-- Complex business logic
+- sklearn pipeline 無法捕捉的自訂預處理
+- 一個端點中有多個模型
+- 自訂輸出格式
+- 推論期間的外部 API 呼叫
+- 複雜的業務邏輯
 
-## Basic Pattern
+## 基本模式
 
 ```python
 import mlflow
@@ -18,7 +18,7 @@ import pandas as pd
 
 class MyCustomModel(mlflow.pyfunc.PythonModel):
     def load_context(self, context):
-        """Load artifacts when model is loaded."""
+        """模型載入時載入工件 (artifacts)。"""
         import pickle
         with open(context.artifacts["preprocessor"], "rb") as f:
             self.preprocessor = pickle.load(f)
@@ -26,15 +26,15 @@ class MyCustomModel(mlflow.pyfunc.PythonModel):
             self.model = pickle.load(f)
     
     def predict(self, context, model_input: pd.DataFrame) -> pd.DataFrame:
-        """Run prediction with preprocessing."""
-        # Preprocess
+        """執行帶有預處理的預測。"""
+        # 預處理
         processed = self.preprocessor.transform(model_input)
-        # Predict
+        # 預測
         predictions = self.model.predict(processed)
-        # Return as DataFrame
+        # 以 DataFrame 返回
         return pd.DataFrame({"prediction": predictions})
 
-# Log the model
+# 記錄模型
 with mlflow.start_run():
     mlflow.pyfunc.log_model(
         artifact_path="model",
@@ -48,19 +48,19 @@ with mlflow.start_run():
     )
 ```
 
-## With Model Signature
+## 帶有模型簽章 (Model Signature)
 
 ```python
 from mlflow.models import infer_signature, ModelSignature
 from mlflow.types.schema import Schema, ColSpec
 
-# Option 1: Infer from data
+# 選項 1：從資料推斷
 signature = infer_signature(
     model_input=X_sample,
     model_output=predictions_sample
 )
 
-# Option 2: Define explicitly
+# 選項 2：明確定義
 input_schema = Schema([
     ColSpec("double", "age"),
     ColSpec("double", "income"),
@@ -81,9 +81,9 @@ mlflow.pyfunc.log_model(
 )
 ```
 
-## File-Based Logging (Models from Code)
+## 基於檔案的記錄 (來自程式碼的模型)
 
-For complex models, log from a Python file instead of a class instance:
+對於複雜模型，從 Python 檔案而不是類別實例記錄：
 
 ```python
 # my_model.py
@@ -92,10 +92,10 @@ from mlflow.pyfunc import PythonModel
 
 class MyModel(PythonModel):
     def predict(self, context, model_input):
-        # Your prediction logic
+        # 您的預測邏輯
         return model_input * 2
 
-# Export the model instance
+# 匯出模型實例
 mlflow.models.set_model(MyModel())
 ```
 
@@ -108,13 +108,13 @@ mlflow.set_registry_uri("databricks-uc")
 with mlflow.start_run():
     model_info = mlflow.pyfunc.log_model(
         name="my-model",
-        python_model="my_model.py",  # File path, not instance
+        python_model="my_model.py",  # 檔案路徑，非實例
         pip_requirements=["mlflow>=3.0"],
         registered_model_name="main.models.my_model"
     )
 ```
 
-## With External Dependencies
+## 帶有外部相依性
 
 ```python
 mlflow.pyfunc.log_model(
@@ -124,15 +124,15 @@ mlflow.pyfunc.log_model(
         "scikit-learn==1.3.0",
         "pandas==2.0.0",
         "numpy==1.24.0",
-        "requests>=2.28.0",  # For external API calls
+        "requests>=2.28.0",  # 用於外部 API 呼叫
     ],
-    # Or reference a requirements file
+    # 或參考 requirements 檔案
     # pip_requirements="requirements.txt",
     registered_model_name="main.models.my_model"
 )
 ```
 
-## With Code Dependencies
+## 帶有程式碼相依性
 
 ```python
 mlflow.pyfunc.log_model(
@@ -144,28 +144,28 @@ mlflow.pyfunc.log_model(
 )
 ```
 
-## Testing Before Deployment
+## 部署前測試
 
 ```python
-# Load and test locally
+# 在本地載入並測試
 loaded_model = mlflow.pyfunc.load_model(model_info.model_uri)
 
-# Test prediction
+# 測試預測
 test_input = pd.DataFrame({"age": [25], "income": [50000]})
 result = loaded_model.predict(test_input)
 print(result)
 
-# Pre-deployment validation
+# 部署前驗證
 mlflow.models.predict(
     model_uri=model_info.model_uri,
     input_data={"age": 25, "income": 50000},
-    env_manager="uv",  # Use uv for faster env creation
+    env_manager="uv",  # 使用 uv 加速環境建立
 )
 ```
 
-## Deploy Custom Model
+## 部署自訂模型
 
-Same as classical ML - use UI, MLflow SDK, or Databricks SDK:
+與經典 ML 相同 - 使用 UI、MLflow SDK 或 Databricks SDK：
 
 ```python
 from mlflow.deployments import get_deploy_client
@@ -186,7 +186,7 @@ endpoint = client.create_endpoint(
 )
 ```
 
-## Query Custom Model
+## 查詢自訂模型
 
 ```
 query_serving_endpoint(
@@ -197,7 +197,7 @@ query_serving_endpoint(
 )
 ```
 
-Or with inputs format:
+或使用輸入格式：
 
 ```
 query_serving_endpoint(

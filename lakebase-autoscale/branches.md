@@ -1,19 +1,19 @@
-# Lakebase Autoscaling Branches
+# Lakebase Autoscaling 分支 (Branches)
 
-## Overview
+## 概述
 
-Branches in Lakebase Autoscaling are isolated database environments that share storage with their parent through copy-on-write. They enable Git-like workflows for databases: create isolated dev/test environments, test schema changes safely, and recover from mistakes.
+Lakebase Autoscaling 中的分支是隔離的資料庫環境，透過寫入時複製 (copy-on-write) 與其父分支共用儲存。它們為資料庫啟用了類似 Git 的工作流程：建立隔離的開發/測試環境、安全地測試架構變更，以及從錯誤中復原。
 
-## Branch Types
+## 分支類型
 
-| Option | Description | Use Case |
+| 選項 | 描述 | 使用案例 |
 |--------|-------------|----------|
-| **Current data** | Branch from latest state of parent | Development, testing with current data |
-| **Past data** | Branch from a specific point in time | Point-in-time recovery, historical analysis |
+| **Current data** | 從父分支的最新狀態分支 | 使用當前資料進行開發、測試 |
+| **Past data** | 從特定時間點分支 | 時間點復原、歷史分析 |
 
-## Creating a Branch
+## 建立分支
 
-### With Expiration (TTL)
+### 具有到期時間 (TTL)
 
 ```python
 from databricks.sdk import WorkspaceClient
@@ -21,7 +21,7 @@ from databricks.sdk.service.postgres import Branch, BranchSpec, Duration
 
 w = WorkspaceClient()
 
-# Create branch with 7-day expiration
+# 建立具有 7 天到期時間的分支
 result = w.postgres.create_branch(
     parent="projects/my-app",
     branch=Branch(
@@ -37,7 +37,7 @@ print(f"Branch created: {result.name}")
 print(f"Expires: {result.status.expire_time}")
 ```
 
-### Permanent Branch (No Expiration)
+### 永久分支 (無到期)
 
 ```python
 result = w.postgres.create_branch(
@@ -55,7 +55,7 @@ result = w.postgres.create_branch(
 ### CLI
 
 ```bash
-# With TTL
+# 具有 TTL
 databricks postgres create-branch projects/my-app development \
     --json '{
         "spec": {
@@ -64,7 +64,7 @@ databricks postgres create-branch projects/my-app development \
         }
     }'
 
-# Permanent
+# 永久
 databricks postgres create-branch projects/my-app staging \
     --json '{
         "spec": {
@@ -74,7 +74,7 @@ databricks postgres create-branch projects/my-app staging \
     }'
 ```
 
-## Getting Branch Details
+## 取得分支詳細資訊
 
 ```python
 branch = w.postgres.get_branch(
@@ -88,7 +88,7 @@ print(f"State: {branch.status.current_state}")
 print(f"Size: {branch.status.logical_size_bytes} bytes")
 ```
 
-## Listing Branches
+## 列出分支
 
 ```python
 branches = list(w.postgres.list_branches(
@@ -101,9 +101,9 @@ for branch in branches:
     print(f"  Protected: {branch.status.is_protected}")
 ```
 
-## Protecting a Branch
+## 保護分支
 
-Protected branches cannot be deleted, reset, or archived.
+受保護的分支無法被刪除、重設或封存。
 
 ```python
 from databricks.sdk.service.postgres import Branch, BranchSpec, FieldMask
@@ -118,7 +118,7 @@ w.postgres.update_branch(
 ).wait()
 ```
 
-To remove protection:
+移除保護：
 
 ```python
 w.postgres.update_branch(
@@ -131,10 +131,10 @@ w.postgres.update_branch(
 ).wait()
 ```
 
-## Updating Branch Expiration
+## 更新分支到期時間
 
 ```python
-# Extend to 14 days
+# 延長至 14 天
 w.postgres.update_branch(
     name="projects/my-app/branches/development",
     branch=Branch(
@@ -147,7 +147,7 @@ w.postgres.update_branch(
     update_mask=FieldMask(field_mask=["spec.is_protected", "spec.expiration"])
 ).wait()
 
-# Remove expiration
+# 移除到期
 w.postgres.update_branch(
     name="projects/my-app/branches/development",
     branch=Branch(
@@ -158,9 +158,9 @@ w.postgres.update_branch(
 ).wait()
 ```
 
-## Resetting a Branch from Parent
+## 從父分支重設分支
 
-Reset completely replaces a branch's data and schema with the latest from its parent. Local changes are lost.
+重設會用父分支的最新狀態完全取代分支的資料和架構。本地變更將會遺失。
 
 ```python
 w.postgres.reset_branch(
@@ -168,12 +168,12 @@ w.postgres.reset_branch(
 ).wait()
 ```
 
-**Constraints:**
-- Root branches (like `production`) cannot be reset (no parent)
-- Branches with children cannot be reset (delete children first)
-- Connections are temporarily interrupted during reset
+**限制：**
+- 根分支 (如 `production`) 無法重設 (無父分支)
+- 有子分支的分支無法重設 (先刪除子分支)
+- 重設期間連線會暫時中斷
 
-## Deleting a Branch
+## 刪除分支
 
 ```python
 w.postgres.delete_branch(
@@ -181,32 +181,32 @@ w.postgres.delete_branch(
 ).wait()
 ```
 
-**Constraints:**
-- Cannot delete branches with child branches (delete children first)
-- Cannot delete protected branches (remove protection first)
-- Cannot delete the default branch
+**限制：**
+- 無法刪除有子分支的分支 (先刪除子分支)
+- 無法刪除受保護的分支 (先移除保護)
+- 無法刪除預設分支
 
-## Branch Expiration
+## 分支到期
 
-Branch expiration sets an automatic deletion timestamp. Useful for:
-- **CI/CD environments**: 2-4 hours
-- **Demos**: 24-48 hours
-- **Feature development**: 1-7 days
-- **Long-term testing**: up to 30 days
+分支到期設定自動刪除的時間戳記。適用於：
+- **CI/CD 環境**: 2-4 小時
+- **示範 (Demos)**: 24-48 小時
+- **功能開發**: 1-7 天
+- **長期測試**: 最多 30 天
 
-**Maximum expiration period:** 30 days from current time.
+**最大到期期間：** 從當前時間起 30 天。
 
-### Expiration Restrictions
+### 到期限制
 
-- Cannot expire protected branches
-- Cannot expire default branches
-- Cannot expire branches that have children
-- When a branch expires, all compute resources are also deleted
+- 無法使受保護的分支到期
+- 無法使預設分支到期
+- 無法使有子分支的分支到期
+- 當分支到期時，所有計算資源也會被刪除
 
-## Best Practices
+## 最佳實踐
 
-1. **Use TTL for ephemeral branches**: Set expiration for dev/test branches to avoid accumulation
-2. **Protect production branches**: Prevent accidental deletion or reset
-3. **Reset instead of recreate**: Use reset from parent when you need fresh data without new branch overhead
-4. **Schema diff before merge**: Compare schemas between branches before applying changes to production
-5. **Monitor unarchived limit**: Only 10 unarchived branches are allowed per project
+1. **對臨時分支使用 TTL**: 為開發/測試分支設定到期時間以避免堆積
+2. **保護生產分支**: 防止意外刪除或重設
+3. **重設而非重新建立**: 當需要新鮮資料而不需要新分支開銷時，從父分支重設
+4. **合併前比較架構**: 在將變更套用到生產環境之前，比較分支之間的架構
+5. **監控未封存限制**: 每個專案僅允許 10 個未封存的分支

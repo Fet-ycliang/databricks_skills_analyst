@@ -1,20 +1,20 @@
-# Package Requirements
+# 套件需求 (Package Requirements)
 
-Databricks Runtime versions and pip package compatibility.
+Databricks Runtime 版本和 pip 套件相容性。
 
-## Recommended Databricks Runtime
+## 推薦的 Databricks Runtime
 
-| DBR Version | Status | Notes |
+| DBR 版本 | 狀態 | 備註 |
 |-------------|--------|-------|
-| **16.1+** | Recommended | Latest GenAI packages pre-installed |
-| **15.4 LTS** | Supported | May need more pip installs |
-| **14.x** | Legacy | Missing many GenAI features |
+| **16.1+** | 推薦 | 預先安裝最新的 GenAI 套件 |
+| **15.4 LTS** | 支援 | 需要更多 pip 安裝 |
+| **14.x** | 舊版 | 缺少許多 GenAI 功能 |
 
-**Use DBR 16.1+ for agent development** - it has most packages pre-installed.
+**使用 DBR 16.1+ 進行代理開發** - 它預先安裝了大多數套件。
 
-## Pre-installed Packages (DBR 16.1+)
+## 預先安裝的套件 (DBR 16.1+)
 
-These are available without `%pip install`:
+無需 `%pip install` 即可使用：
 
 - `mlflow` (3.x)
 - `langchain`
@@ -23,46 +23,46 @@ These are available without `%pip install`:
 - `scikit-learn`
 - `databricks-sdk`
 
-## Packages to Install
+## 需要安裝的套件
 
-For GenAI agents, install these:
+對於 GenAI 代理，安裝這些：
 
 ```python
 %pip install -U mlflow==3.6.0 databricks-langchain langgraph==0.3.4 databricks-agents pydantic
 dbutils.library.restartPython()
 ```
 
-### Package Breakdown
+### 套件細目
 
-| Package | Purpose | Version |
+| 套件 | 用途 | 版本 |
 |---------|---------|---------|
-| `mlflow` | Model logging, serving | `==3.6.0` |
-| `databricks-langchain` | ChatDatabricks, UCFunctionToolkit | Latest |
-| `langgraph` | Agent graph framework | `==0.3.4` |
-| `databricks-agents` | `agents.deploy()` | Latest |
-| `pydantic` | Data validation | Latest |
+| `mlflow` | 模型記錄、服務 | `==3.6.0` |
+| `databricks-langchain` | ChatDatabricks, UCFunctionToolkit | 最新 |
+| `langgraph` | 代理圖框架 | `==0.3.4` |
+| `databricks-agents` | `agents.deploy()` | 最新 |
+| `pydantic` | 資料驗證 | 最新 |
 
-### With Memory/Lakebase Support
+### 帶有 Memory/Lakebase 支援
 
 ```python
 %pip install -U mlflow==3.6.0 databricks-langchain[memory] langgraph==0.3.4 databricks-agents
 ```
 
-### For Vector Search
+### 用於 Vector Search
 
 ```python
 %pip install -U mlflow==3.6.0 databricks-langchain databricks-vectorsearch langgraph==0.3.4
 ```
 
-### Minimal for Testing
+### 測試用最小安裝
 
 ```python
 %pip install -U mlflow-skinny[databricks] databricks-agents
 ```
 
-## pip_requirements for Model Logging
+## 模型記錄的 pip_requirements
 
-When logging models, specify exact versions:
+記錄模型時，指定確切版本：
 
 ```python
 pip_requirements=[
@@ -73,7 +73,7 @@ pip_requirements=[
 ]
 ```
 
-### Get Current Versions Dynamically
+### 動態獲取當前版本
 
 ```python
 from pkg_resources import get_distribution
@@ -85,9 +85,9 @@ pip_requirements=[
 ]
 ```
 
-## Tested Combinations
+## 經測試的組合
 
-### Agent Development (Recommended)
+### 代理開發（推薦）
 
 ```
 mlflow==3.6.0
@@ -97,7 +97,7 @@ databricks-agents>=0.20.0
 pydantic>=2.0
 ```
 
-### LangChain Tracing
+### LangChain 追蹤
 
 ```
 mlflow==2.14.0
@@ -106,7 +106,7 @@ langchain-openai==0.1.8
 langchain-community==0.2.1
 ```
 
-### Classical ML
+### 經典 ML
 
 ```
 mlflow>=2.10.0
@@ -114,32 +114,32 @@ scikit-learn>=1.3.0
 pandas>=2.0.0
 ```
 
-## Common Version Issues
+## 常見版本問題
 
-| Issue | Cause | Solution |
+| 問題 | 原因 | 解決方案 |
 |-------|-------|----------|
-| **ImportError: ResponsesAgent** | Old mlflow | `pip install mlflow>=3.0` |
-| **LangGraph errors** | Version mismatch | Pin to `langgraph==0.3.4` |
-| **Pydantic validation error** | v1 vs v2 | Use `pydantic>=2.0` |
-| **ChatDatabricks not found** | Missing package | `pip install databricks-langchain` |
-| **agents.deploy fails** | Missing package | `pip install databricks-agents` |
+| **ImportError: ResponsesAgent** | 舊 mlflow | `pip install mlflow>=3.0` |
+| **LangGraph 錯誤** | 版本不匹配 | 固定為 `langgraph==0.3.4` |
+| **Pydantic 驗證錯誤** | v1 vs v2 | 使用 `pydantic>=2.0` |
+| **ChatDatabricks 找不到** | 缺少套件 | `pip install databricks-langchain` |
+| **agents.deploy 失敗** | 缺少套件 | `pip install databricks-agents` |
 
-## Environment Variables
+## 環境變數
 
-Set these for authentication:
+設定這些以進行驗證：
 
 ```bash
-# Option 1: Host + Token
+# 選項 1：Host + Token
 export DATABRICKS_HOST="https://your-workspace.databricks.com"
 export DATABRICKS_TOKEN="your-token"
 
-# Option 2: Profile
+# 選項 2：Profile
 export DATABRICKS_CONFIG_PROFILE="your-profile"
 ```
 
-## Installing Packages via MCP
+## 透過 MCP 安裝套件
 
-Use `execute_databricks_command`:
+使用 `execute_databricks_command`：
 
 ```
 execute_databricks_command(
@@ -147,7 +147,7 @@ execute_databricks_command(
 )
 ```
 
-Then restart Python:
+然後重啟 Python：
 
 ```
 execute_databricks_command(
@@ -157,7 +157,7 @@ execute_databricks_command(
 )
 ```
 
-## Checking Installed Versions
+## 檢查已安裝版本
 
 ```python
 import pkg_resources
@@ -171,7 +171,7 @@ for pkg in packages:
         print(f"{pkg}: NOT INSTALLED")
 ```
 
-Via MCP:
+透過 MCP：
 
 ```
 execute_databricks_command(

@@ -1,12 +1,12 @@
 # Spark Declarative Pipelines
 
-Creates, configures, and updates Databricks Lakeflow Spark Declarative Pipelines (SDP/LDP) using serverless compute.
+使用 Serverless Compute 建立、設定與更新 Databricks Lakeflow Spark Declarative Pipelines (SDP/LDP)。
 
-## Overview
+## 概述
 
-This skill covers the end-to-end lifecycle of Spark Declarative Pipelines (formerly Delta Live Tables), including streaming tables, materialized views, CDC, SCD Type 2, and Auto Loader ingestion patterns. It activates when users build data pipelines, work with Delta Live Tables, ingest streaming data, implement change data capture, or mention SDP, LDP, DLT, Lakeflow, streaming tables, or bronze/silver/gold medallion architectures. The skill supports both Asset Bundle initialization (`databricks pipelines init`) and manual MCP-driven workflows using SQL or the modern `pyspark.pipelines` Python API.
+此技能涵蓋 Spark Declarative Pipelines (前身為 Delta Live Tables) 的端對端生命週期，包括串流資料表 (Streaming Tables)、物化視圖 (Materialized Views)、CDC、SCD Type 2 以及 Auto Loader 攝取模式。當使用者建置資料管線、使用 Delta Live Tables、攝取串流資料、實作變更資料擷取，或提及 SDP、LDP、DLT、Lakeflow、Streaming Tables 或 Bronze/Silver/Gold 獎章架構時，此技能便會啟動。此技能支援 Asset Bundle 初始化 (`databricks pipelines init`) 與使用 SQL 或現代化 `pyspark.pipelines` Python API 的手動 MCP 驅動工作流程。
 
-## What's Included
+## 包含內容
 
 ```
 spark-declarative-pipelines/
@@ -21,47 +21,47 @@ spark-declarative-pipelines/
 └── 8-project-initialization.md
 ```
 
-## Key Topics
+## 關鍵主題
 
-- Auto Loader ingestion with `read_files()` for JSON, CSV, Parquet, and Avro from cloud storage
-- Streaming sources: Kafka, Event Hub, Kinesis
-- Deduplication, windowed aggregations, and stateful streaming operations
-- Change Data Capture (CDC) with AUTO CDC and SCD Type 1/Type 2 patterns
-- Querying SCD Type 2 history tables with `__START_AT` / `__END_AT` temporal columns
-- Liquid Clustering (`CLUSTER BY`) replacing legacy `PARTITION BY` and `Z-ORDER`
-- Modern Python API (`pyspark.pipelines` as `dp`) vs. legacy DLT API (`import dlt`)
-- DLT-to-SDP migration decision matrix and step-by-step guide
-- Advanced configuration via `extra_settings` (development mode, continuous pipelines, Photon, Python dependencies)
-- Project initialization with `databricks pipelines init` and Asset Bundles
-- Medallion architecture (bronze/silver/gold) with flat or subdirectory layouts
-- Serverless compute requirements, constraints, and when to fall back to classic clusters
+- 使用 `read_files()` 的 Auto Loader 攝取，支援來自雲端儲存的 JSON, CSV, Parquet 與 Avro
+- 串流來源：Kafka, Event Hub, Kinesis
+- 去重、視窗聚合與有狀態串流操作
+- 搭配 AUTO CDC 與 SCD Type 1/Type 2 模式的變更資料擷取 (CDC)
+- 使用 `__START_AT` / `__END_AT` 時間欄位查詢 SCD Type 2 歷史資料表
+- Liquid Clustering (`CLUSTER BY`) 取代舊版 `PARTITION BY` 與 `Z-ORDER`
+- 現代化 Python API (`pyspark.pipelines` as `dp`) vs. 舊版 DLT API (`import dlt`)
+- DLT 到 SDP 的遷移決策矩陣與逐步指南
+- 透過 `extra_settings` 進行進階設定 (開發模式、持續管線、Photon、Python 相依性)
+- 使用 `databricks pipelines init` 與 Asset Bundles 初始化專案
+- 扁平或子目錄佈局的獎章架構 (Bronze/Silver/Gold)
+- Serverless Compute 需求、限制以及何時退回 Classic Clusters
 
-## When to Use
+## 何時使用
 
-- Creating a new data pipeline on Databricks
-- Ingesting files from cloud storage using Auto Loader
-- Building streaming tables or materialized views
-- Implementing change data capture (CDC) or slowly changing dimensions (SCD Type 2)
-- Migrating existing Delta Live Tables (DLT) pipelines to the modern SDP framework
-- Setting up a medallion architecture (bronze/silver/gold layers)
-- Configuring pipeline performance with Liquid Clustering
-- Initializing a new pipeline project with Asset Bundles
-- Debugging pipeline errors (empty tables, streaming read failures, column not found)
+- 在 Databricks 上建立新的資料管線
+- 使用 Auto Loader 從雲端儲存攝取檔案
+- 建置串流資料表或物化視圖
+- 實作變更資料擷取 (CDC) 或緩慢變更維度 (SCD Type 2)
+- 將現有 Delta Live Tables (DLT) 管線遷移至現代化 SDP 框架
+- 設定獎章架構 (Bronze/Silver/Gold 層)
+- 使用 Liquid Clustering 設定管線效能
+- 使用 Asset Bundles 初始化新管線專案
+- 偵錯管線錯誤 (空資料表、串流讀取失敗、找不到欄位)
 
-## Related Skills
+## 相關技能
 
-- [Databricks Jobs](../databricks-jobs/) -- for orchestrating and scheduling pipeline runs
-- [Asset Bundles](../asset-bundles/) -- for multi-environment deployment of pipeline projects
-- [Synthetic Data Generation](../synthetic-data-generation/) -- for generating test data to feed into pipelines
-- [Databricks Unity Catalog](../databricks-unity-catalog/) -- for catalog/schema/volume management and governance
+- [Databricks Jobs](../databricks-jobs/) -- 用於編排與排程管線執行
+- [Asset Bundles](../asset-bundles/) -- 用於管線專案的多環境部署
+- [Synthetic Data Generation](../synthetic-data-generation/) -- 用於產生測試資料以餵入管線
+- [Databricks Unity Catalog](../databricks-unity-catalog/) -- 用於 Catalog/Schema/Volume 管理與治理
 
-## Resources
+## 資源
 
-- [Lakeflow Spark Declarative Pipelines Overview](https://docs.databricks.com/aws/en/ldp/)
-- [SQL Language Reference](https://docs.databricks.com/aws/en/ldp/developer/sql-dev)
-- [Python Language Reference](https://docs.databricks.com/aws/en/ldp/developer/python-ref)
-- [Loading Data (Auto Loader, Kafka, Kinesis)](https://docs.databricks.com/aws/en/ldp/load)
-- [Change Data Capture (CDC)](https://docs.databricks.com/aws/en/ldp/cdc)
-- [Developing Pipelines](https://docs.databricks.com/aws/en/ldp/develop)
+- [Lakeflow Spark Declarative Pipelines 概述](https://docs.databricks.com/aws/en/ldp/)
+- [SQL 語言參考](https://docs.databricks.com/aws/en/ldp/developer/sql-dev)
+- [Python 語言參考](https://docs.databricks.com/aws/en/ldp/developer/python-ref)
+- [載入資料 (Auto Loader, Kafka, Kinesis)](https://docs.databricks.com/aws/en/ldp/load)
+- [變更資料擷取 (CDC)](https://docs.databricks.com/aws/en/ldp/cdc)
+- [開發管線](https://docs.databricks.com/aws/en/ldp/develop)
 - [Liquid Clustering](https://docs.databricks.com/aws/en/delta/clustering)
-- [read_files -- Usage in Streaming Tables](https://docs.databricks.com/aws/en/sql/language-manual/functions/read_files#usage-in-streaming-tables)
+- [read_files -- 用於串流資料表](https://docs.databricks.com/aws/en/sql/language-manual/functions/read_files#usage-in-streaming-tables)

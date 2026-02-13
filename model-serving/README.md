@@ -19,7 +19,7 @@ model-serving/
 ├── 6-logging-registration.md   # mlflow.pyfunc.log_model、資源、Unity Catalog 註冊
 ├── 7-deployment.md             # 代理的非同步基於作業部署、ML 的 SDK 部署
 ├── 8-querying-endpoints.md     # MCP 工具、Python SDK、REST API 和 OpenAI 相容查詢
-└── 9-package-requirements.md   # DBR 版本、pip 安裝、已測試的套件組合
+├── 9-package-requirements.md   # DBR 版本、pip 安裝、已測試的套件組合
 ```
 
 ## 關鍵主題

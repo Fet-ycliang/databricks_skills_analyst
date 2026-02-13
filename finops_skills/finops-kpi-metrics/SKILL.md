@@ -9,6 +9,22 @@ description: 定義用於衡量 FinOps 成熟度和效能的關鍵績效指標�
 
 本文件定義用於衡量 FinOps 成熟度和效能的關鍵績效指標（KPI），並提供 SQL 查詢來追蹤每個指標的時間趨勢。
 
+## 🤖 聊天機器人問答映射 (Chatbot QA Mapping)
+
+下表協助 Assistant 將使用者的自然語言提問映射至特定的 KPI 查詢：
+
+| 使用者提問 (User Question) | 相關 KPI | 查詢代碼 |
+| :--- | :--- | :--- |
+| "我們的成本效率如何？", "每個用戶的成本是多少？" | **單位成本 (Unit Economics)** | `KPI 1.1` |
+| "我們的 RI 買得夠多嗎？", "承諾覆蓋率是多少？" | **承諾覆蓋率 (Commitment Coverage)** | `KPI 1.2` |
+| "我們省了多少錢？", "優化有效果嗎？" | **成本效率比率** | `KPI 1.3` |
+| "所有資源都有標籤嗎？", "哪些資源沒貼標籤？" | **標籤覆蓋率** | `KPI 2.1` |
+| "成本資料是最新的嗎？", "資料延遲多久？" | **成本可見性時效性** | `KPI 2.2` |
+| "我們還有多少節省空間？", "有哪些優化機會？" | **已識別的節省機會** | `KPI 3.1` |
+| "這個月的預算爆了嗎？", "預算偏差是多少？" | **預算準確度** | `KPI 4.2` |
+| "雲端成本佔營收多少？" | **雲端成本佔收入比** | `KPI 6.1` |
+| "我們的 FinOps 成熟度幾分？" | **FinOps 成熟度計分卡** | `Scorecard` |
+
 ---
 
 ## 🎯 KPI 類別
@@ -71,19 +87,19 @@ ORDER BY mc.month DESC
 **計算公式**：保留實例成本 / 總運算成本 × 100%
 
 ```sql
--- 保留實例覆蓋率趨勢
+-- 承諾覆蓋率趨勢 (Reserved + Savings Plan)
 SELECT 
   year_month AS month,
   cost_category,
-  ROUND(SUM(CASE WHEN is_reservation THEN CostInBillingCurrency ELSE 0 END), 2) AS reserved_cost,
-  ROUND(SUM(CostInBillingCurrency), 2) AS total_cost,
-  ROUND(SUM(CASE WHEN is_reservation THEN CostInBillingCurrency ELSE 0 END) / 
-        NULLIF(SUM(CostInBillingCurrency), 0) * 100, 2) AS reservation_coverage_pct,
-  ROUND((SUM(CASE WHEN is_reservation THEN CostInBillingCurrency ELSE 0 END) / 
-         NULLIF(SUM(CostInBillingCurrency), 0) * 100) - 
-        LAG(SUM(CASE WHEN is_reservation THEN CostInBillingCurrency ELSE 0 END) / 
-            NULLIF(SUM(CostInBillingCurrency), 0) * 100) OVER (PARTITION BY cost_category ORDER BY year_month), 2) AS mom_change
-FROM develop_catalog.system_report.infra_azure_cost_silver
+  ROUND(SUM(reservation_cost + savingplan_cost), 2) AS commitment_cost,
+  ROUND(SUM(total_cost), 2) AS total_cost,
+  ROUND(SUM(reservation_cost + savingplan_cost) / 
+        NULLIF(SUM(total_cost), 0) * 100, 2) AS commitment_coverage_pct,
+  ROUND((SUM(reservation_cost + savingplan_cost) / 
+         NULLIF(SUM(total_cost), 0) * 100) - 
+        LAG(SUM(reservation_cost + savingplan_cost) / 
+            NULLIF(SUM(total_cost), 0) * 100) OVER (PARTITION BY cost_category ORDER BY year_month), 2) AS mom_change
+FROM develop_catalog.system_report.finops_daily_cost_summary
 WHERE year_month >= DATE_FORMAT(DATE_SUB(CURRENT_DATE(), 365), 'yyyy-MM')
   AND cost_category IN ('Compute', 'Database')
 GROUP BY month, cost_category
@@ -104,14 +120,14 @@ WITH baseline_cost AS (
   SELECT 
     SUM(CostInBillingCurrency) AS baseline
   FROM develop_catalog.system_report.infra_azure_cost_silver
-  WHERE Date BETWEEN DATE_SUB(CURRENT_DATE(), 395) AND DATE_SUB(CURRENT_DATE(), 365)
+  WHERE date_key BETWEEN CAST(DATE_FORMAT(DATE_SUB(CURRENT_DATE(), 395), 'yyyyMMdd') AS INT) AND CAST(DATE_FORMAT(DATE_SUB(CURRENT_DATE(), 365), 'yyyyMMdd') AS INT)
 ),
 current_cost AS (
   SELECT 
-    DATE_FORMAT(Date, 'yyyy-MM') AS month,
+    year_month AS month,
     SUM(CostInBillingCurrency) AS monthly_cost
   FROM develop_catalog.system_report.infra_azure_cost_silver
-  WHERE Date >= DATE_SUB(CURRENT_DATE(), 365)
+  WHERE year_month >= DATE_FORMAT(DATE_SUB(CURRENT_DATE(), 365), 'yyyy-MM')
   GROUP BY month
 )
 SELECT 
@@ -138,7 +154,7 @@ ORDER BY cc.month DESC
 ```sql
 -- 標籤覆蓋率 KPI
 SELECT 
-  DATE_FORMAT(Date, 'yyyy-MM') AS month,
+  year_month AS month,
   COUNT(DISTINCT ResourceName) AS total_resources,
   COUNT(DISTINCT CASE WHEN tag_cost_center IS NOT NULL THEN ResourceName END) AS tagged_cost_center,
   COUNT(DISTINCT CASE WHEN tag_environment IS NOT NULL THEN ResourceName END) AS tagged_environment,
@@ -157,8 +173,9 @@ SELECT
      AND tag_owner IS NOT NULL 
     THEN ResourceName 
   END) / NULLIF(COUNT(DISTINCT ResourceName), 0) * 100, 2) AS full_tag_coverage_pct
+  END) / NULLIF(COUNT(DISTINCT ResourceName), 0) * 100, 2) AS full_tag_coverage_pct
 FROM develop_catalog.system_report.infra_azure_cost_silver
-WHERE Date >= DATE_SUB(CURRENT_DATE(), 365)
+WHERE year_month >= DATE_FORMAT(DATE_SUB(CURRENT_DATE(), 365), 'yyyy-MM')
 GROUP BY month
 ORDER BY month DESC
 ```
@@ -188,11 +205,11 @@ UNION ALL
 
 SELECT 
   'Silver Layer' AS layer,
-  MAX(CAST(Date AS DATE)) AS latest_date,
-  DATEDIFF(CURRENT_DATE(), MAX(CAST(Date AS DATE))) AS days_lag,
+  TO_DATE(CAST(MAX(date_key) AS STRING), 'yyyyMMdd') AS latest_date,
+  DATEDIFF(CURRENT_DATE(), TO_DATE(CAST(MAX(date_key) AS STRING), 'yyyyMMdd')) AS days_lag,
   CASE 
-    WHEN DATEDIFF(CURRENT_DATE(), MAX(CAST(Date AS DATE))) <= 1 THEN '✅ 符合 SLA'
-    WHEN DATEDIFF(CURRENT_DATE(), MAX(CAST(Date AS DATE))) <= 2 THEN '🟡 接近 SLA'
+    WHEN DATEDIFF(CURRENT_DATE(), TO_DATE(CAST(MAX(date_key) AS STRING), 'yyyyMMdd')) <= 1 THEN '✅ 符合 SLA'
+    WHEN DATEDIFF(CURRENT_DATE(), TO_DATE(CAST(MAX(date_key) AS STRING), 'yyyyMMdd')) <= 2 THEN '🟡 接近 SLA'
     ELSE '🔴 違反 SLA'
   END AS sla_status
 FROM develop_catalog.system_report.infra_azure_cost_silver
@@ -201,11 +218,11 @@ UNION ALL
 
 SELECT 
   'Gold Layer' AS layer,
-  MAX(CAST(Date AS DATE)) AS latest_date,
-  DATEDIFF(CURRENT_DATE(), MAX(CAST(Date AS DATE))) AS days_lag,
+  TO_DATE(CAST(MAX(date_key) AS STRING), 'yyyyMMdd') AS latest_date,
+  DATEDIFF(CURRENT_DATE(), TO_DATE(CAST(MAX(date_key) AS STRING), 'yyyyMMdd')) AS days_lag,
   CASE 
-    WHEN DATEDIFF(CURRENT_DATE(), MAX(CAST(Date AS DATE))) <= 1 THEN '✅ 符合 SLA'
-    WHEN DATEDIFF(CURRENT_DATE(), MAX(CAST(Date AS DATE))) <= 2 THEN '🟡 接近 SLA'
+    WHEN DATEDIFF(CURRENT_DATE(), TO_DATE(CAST(MAX(date_key) AS STRING), 'yyyyMMdd')) <= 1 THEN '✅ 符合 SLA'
+    WHEN DATEDIFF(CURRENT_DATE(), TO_DATE(CAST(MAX(date_key) AS STRING), 'yyyyMMdd')) <= 2 THEN '🟡 接近 SLA'
     ELSE '🔴 違反 SLA'
   END AS sla_status
 FROM develop_catalog.system_report.finops_daily_cost_summary
@@ -229,7 +246,7 @@ WITH idle_resources AS (
     COUNT(DISTINCT ResourceName) AS resource_count,
     SUM(CostInBillingCurrency) * 0.90 AS potential_savings
   FROM develop_catalog.system_report.infra_azure_cost_silver
-  WHERE Date >= DATE_SUB(CURRENT_DATE(), 30)
+  WHERE date_key >= CAST(DATE_FORMAT(DATE_SUB(CURRENT_DATE(), 30), 'yyyyMMdd') AS INT)
     AND Quantity = 0 AND CostInBillingCurrency > 0
 ),
 rightsizing AS (
@@ -238,7 +255,7 @@ rightsizing AS (
     COUNT(DISTINCT ResourceName) AS resource_count,
     SUM(CostInBillingCurrency) * 0.30 AS potential_savings
   FROM develop_catalog.system_report.infra_azure_cost_silver
-  WHERE Date >= DATE_SUB(CURRENT_DATE(), 30)
+  WHERE date_key >= CAST(DATE_FORMAT(DATE_SUB(CURRENT_DATE(), 30), 'yyyyMMdd') AS INT)
     AND cost_category = 'Compute'
     AND Quantity / 24 < 0.5
 ),
@@ -248,7 +265,7 @@ reservation_opportunities AS (
     COUNT(DISTINCT ResourceName) AS resource_count,
     SUM(CostInBillingCurrency) * 0.40 AS potential_savings
   FROM develop_catalog.system_report.infra_azure_cost_silver
-  WHERE Date >= DATE_SUB(CURRENT_DATE(), 30)
+  WHERE date_key >= CAST(DATE_FORMAT(DATE_SUB(CURRENT_DATE(), 30), 'yyyyMMdd') AS INT)
     AND cost_category IN ('Compute', 'Database')
     AND is_reservation = FALSE
 )
@@ -282,19 +299,19 @@ WITH monthly_baseline AS (
     AVG(daily_cost) * 30 AS baseline_monthly_cost
   FROM (
     SELECT 
-      CAST(Date AS DATE) AS date,
-      SUM(CostInBillingCurrency) AS daily_cost
-    FROM develop_catalog.system_report.infra_azure_cost_silver
-    WHERE Date BETWEEN DATE_SUB(CURRENT_DATE(), 90) AND DATE_SUB(CURRENT_DATE(), 60)
-    GROUP BY date
+      TO_DATE(CAST(date_key AS STRING), 'yyyyMMdd') AS date,
+    SUM(CostInBillingCurrency) AS daily_cost
+  FROM develop_catalog.system_report.infra_azure_cost_silver
+  WHERE date_key BETWEEN CAST(DATE_FORMAT(DATE_SUB(CURRENT_DATE(), 90), 'yyyyMMdd') AS INT) AND CAST(DATE_FORMAT(DATE_SUB(CURRENT_DATE(), 60), 'yyyyMMdd') AS INT)
+  GROUP BY date
   )
 ),
 current_monthly AS (
   SELECT 
-    DATE_FORMAT(Date, 'yyyy-MM') AS month,
+    year_month AS month,
     SUM(CostInBillingCurrency) AS monthly_cost
   FROM develop_catalog.system_report.infra_azure_cost_silver
-  WHERE Date >= DATE_SUB(CURRENT_DATE(), 60)
+  WHERE year_month >= DATE_FORMAT(DATE_SUB(CURRENT_DATE(), 60), 'yyyy-MM')
   GROUP BY month
 )
 SELECT 
@@ -345,11 +362,11 @@ ORDER BY month DESC
 -- 預算 vs 實際（需要預算表）
 WITH monthly_actual AS (
   SELECT 
-    DATE_FORMAT(Date, 'yyyy-MM') AS month,
+    year_month AS month,
     tag_cost_center,
     SUM(CostInBillingCurrency) AS actual_cost
   FROM develop_catalog.system_report.infra_azure_cost_silver
-  WHERE Date >= DATE_SUB(CURRENT_DATE(), 180)
+  WHERE year_month >= DATE_FORMAT(DATE_SUB(CURRENT_DATE(), 180), 'yyyy-MM')
   GROUP BY month, tag_cost_center
 ),
 monthly_budget AS (
@@ -391,7 +408,7 @@ ORDER BY ma.month DESC, variance_pct DESC
 -- 政策合規檢查
 WITH compliance_checks AS (
   SELECT 
-    DATE_FORMAT(Date, 'yyyy-MM') AS month,
+    year_month AS month,
     COUNT(DISTINCT ResourceName) AS total_resources,
     -- 標籤合規
     COUNT(DISTINCT CASE WHEN tag_cost_center IS NOT NULL THEN ResourceName END) AS tagged_resources,
@@ -404,7 +421,7 @@ WITH compliance_checks AS (
       THEN ResourceName 
     END) AS env_compliant
   FROM develop_catalog.system_report.infra_azure_cost_silver
-  WHERE Date >= DATE_SUB(CURRENT_DATE(), 180)
+  WHERE year_month >= DATE_FORMAT(DATE_SUB(CURRENT_DATE(), 180), 'yyyy-MM')
   GROUP BY month
 )
 SELECT 
@@ -431,11 +448,16 @@ ORDER BY month DESC
 -- 雲端成本佔收入比（需要收入資料）
 WITH monthly_costs AS (
   SELECT 
-    DATE_FORMAT(Date, 'yyyy-MM') AS month,
-    SUM(CostInBillingCurrency) AS cloud_cost
-  FROM develop_catalog.system_report.infra_azure_cost_silver
-  WHERE Date >= DATE_SUB(CURRENT_DATE(), 365)
-  GROUP BY month
+    year_month AS month,
+    ROUND(SUM(total_cost), 2) AS total_cost,
+  ROUND(SUM(reservation_cost), 2) AS reserved_cost,
+  ROUND(SUM(spot_cost), 2) AS spot_cost,
+  ROUND(SUM(savingplan_cost), 2) AS saving_plan_cost,
+  ROUND(SUM(on_demand_cost), 2) AS on_demand_cost,
+  ROUND((SUM(reservation_cost) + SUM(savingplan_cost)) / SUM(total_cost) * 100, 2) AS commitment_coverage_pct
+FROM develop_catalog.system_report.finops_daily_cost_summary
+WHERE year_month >= DATE_FORMAT(DATE_SUB(CURRENT_DATE(), 365), 'yyyy-MM')
+GROUP BY month
 ),
 monthly_revenue AS (
   SELECT 
@@ -446,11 +468,11 @@ monthly_revenue AS (
 )
 SELECT 
   mc.month,
-  ROUND(mc.cloud_cost, 2) AS cloud_cost,
+  ROUND(mc.total_cost, 2) AS cloud_cost,
   ROUND(mr.revenue, 2) AS revenue,
-  ROUND(mc.cloud_cost / NULLIF(mr.revenue, 0) * 100, 4) AS cost_of_revenue_pct,
-  ROUND((mc.cloud_cost / NULLIF(mr.revenue, 0) * 100) - 
-        LAG(mc.cloud_cost / NULLIF(mr.revenue, 0) * 100) OVER (ORDER BY mc.month), 4) AS mom_change
+  ROUND(mc.total_cost / NULLIF(mr.revenue, 0) * 100, 4) AS cost_of_revenue_pct,
+  ROUND((mc.total_cost / NULLIF(mr.revenue, 0) * 100) - 
+        LAG(mc.total_cost / NULLIF(mr.revenue, 0) * 100) OVER (ORDER BY mc.month), 4) AS mom_change
 FROM monthly_costs mc
 LEFT JOIN monthly_revenue mr ON mc.month = mr.month
 ORDER BY mc.month DESC
@@ -478,24 +500,24 @@ WITH kpi_scores AS (
       ELSE '🔴'
     END AS status
   FROM develop_catalog.system_report.infra_azure_cost_silver
-  WHERE Date >= DATE_SUB(CURRENT_DATE(), 30)
+  WHERE date_key >= CAST(DATE_FORMAT(DATE_SUB(CURRENT_DATE(), 30), 'yyyyMMdd') AS INT)
   
   UNION ALL
   
   SELECT 
-    'Reservation Coverage' AS kpi_name,
-    ROUND(SUM(CASE WHEN is_reservation THEN CostInBillingCurrency ELSE 0 END) / 
-          NULLIF(SUM(CostInBillingCurrency), 0) * 100, 0) AS score,
+    'Commitment Coverage' AS kpi_name,
+    ROUND(SUM(reservation_cost + savingplan_cost) / 
+          NULLIF(SUM(total_cost), 0) * 100, 0) AS score,
     70 AS target,
     CASE 
-      WHEN SUM(CASE WHEN is_reservation THEN CostInBillingCurrency ELSE 0 END) / 
-           NULLIF(SUM(CostInBillingCurrency), 0) >= 0.70 THEN '✅'
-      WHEN SUM(CASE WHEN is_reservation THEN CostInBillingCurrency ELSE 0 END) / 
-           NULLIF(SUM(CostInBillingCurrency), 0) >= 0.50 THEN '🟡'
+      WHEN SUM(reservation_cost + savingplan_cost) / 
+           NULLIF(SUM(total_cost), 0) >= 0.70 THEN '✅'
+      WHEN SUM(reservation_cost + savingplan_cost) / 
+           NULLIF(SUM(total_cost), 0) >= 0.50 THEN '🟡'
       ELSE '🔴'
     END AS status
-  FROM develop_catalog.system_report.infra_azure_cost_silver
-  WHERE Date >= DATE_SUB(CURRENT_DATE(), 30)
+  FROM develop_catalog.system_report.finops_daily_cost_summary
+  WHERE date_key >= CAST(DATE_FORMAT(DATE_SUB(CURRENT_DATE(), 30), 'yyyyMMdd') AS INT)
     AND cost_category IN ('Compute', 'Database')
 )
 SELECT 

@@ -1,23 +1,23 @@
-# Lakebase Autoscaling Computes
+# Lakebase Autoscaling 計算 (Computes)
 
-## Overview
+## 概述
 
-A compute is a virtualized service that runs Postgres for a branch. Each branch has one primary read-write compute and can have optional read replicas. Computes support autoscaling, scale-to-zero, and granular sizing from 0.5 to 112 CU.
+計算是為分支執行 Postgres 的虛擬化服務。每個分支有一個主要讀寫計算，並可以有選用的讀取副本。計算支援自動擴展、縮減至零 (scale-to-zero) 和從 0.5 到 112 CU 的細粒度調整。
 
-## Compute Sizing
+## 計算大小調整
 
-Each Compute Unit (CU) allocates approximately 2 GB of RAM.
+每個計算單元 (Compute Unit, CU) 分配大約 2 GB 的 RAM。
 
-### Available Sizes
+### 可用大小
 
-| Category | Range | Notes |
+| 類別 | 範圍 | 備註 |
 |----------|-------|-------|
-| **Autoscale computes** | 0.5-32 CU | Dynamic scaling within range (max-min <= 8 CU) |
-| **Large fixed-size** | 36-112 CU | Fixed size, no autoscaling |
+| **自動擴展計算** | 0.5-32 CU | 範圍內的動態擴展 (最大值-最小值 <= 8 CU) |
+| **大型固定大小** | 36-112 CU | 固定大小，無自動擴展 |
 
-### Representative Sizes
+### 代表性大小
 
-| Compute Units | RAM | Max Connections |
+| 計算單元 (Compute Units) | RAM | 最大連線數 |
 |--------------|-----|-----------------|
 | 0.5 CU | ~1 GB | 104 |
 | 1 CU | ~2 GB | 209 |
@@ -28,9 +28,9 @@ Each Compute Unit (CU) allocates approximately 2 GB of RAM.
 | 64 CU | ~128 GB | 4,000 |
 | 112 CU | ~224 GB | 4,000 |
 
-**Note:** Lakebase Provisioned used ~16 GB per CU. Autoscaling uses ~2 GB per CU for more granular scaling.
+**注意：** Lakebase Provisioned 每 CU 使用 ~16 GB。Lakebase Autoscaling 每 CU 使用 ~2 GB 以實現更細粒度的擴展。
 
-## Creating a Compute
+## 建立計算
 
 ```python
 from databricks.sdk import WorkspaceClient
@@ -38,7 +38,7 @@ from databricks.sdk.service.postgres import Endpoint, EndpointSpec, EndpointType
 
 w = WorkspaceClient()
 
-# Create a read-write compute endpoint
+# 建立讀寫計算端點
 result = w.postgres.create_endpoint(
     parent="projects/my-app/branches/production",
     endpoint=Endpoint(
@@ -69,9 +69,9 @@ databricks postgres create-endpoint \
     }'
 ```
 
-**Important:** Each branch can have only one read-write compute.
+**重要：** 每個分支只能有一個讀寫計算。
 
-## Getting Compute Details
+## 取得計算詳細資訊
 
 ```python
 endpoint = w.postgres.get_endpoint(
@@ -86,7 +86,7 @@ print(f"Min CU: {endpoint.status.autoscaling_limit_min_cu}")
 print(f"Max CU: {endpoint.status.autoscaling_limit_max_cu}")
 ```
 
-## Listing Computes
+## 列出計算
 
 ```python
 endpoints = list(w.postgres.list_endpoints(
@@ -99,14 +99,14 @@ for ep in endpoints:
     print(f"  CU Range: {ep.status.autoscaling_limit_min_cu}-{ep.status.autoscaling_limit_max_cu}")
 ```
 
-## Resizing a Compute
+## 調整計算大小
 
-Use `update_mask` to specify which fields to update:
+使用 `update_mask` 指定要更新的欄位：
 
 ```python
 from databricks.sdk.service.postgres import Endpoint, EndpointSpec, FieldMask
 
-# Update min and max CU
+# 更新最小和最大 CU
 w.postgres.update_endpoint(
     name="projects/my-app/branches/production/endpoints/my-compute",
     endpoint=Endpoint(
@@ -126,20 +126,20 @@ w.postgres.update_endpoint(
 ### CLI
 
 ```bash
-# Update single field
+# 更新單個欄位
 databricks postgres update-endpoint \
     projects/my-app/branches/production/endpoints/my-compute \
     spec.autoscaling_limit_max_cu \
     --json '{"spec": {"autoscaling_limit_max_cu": 8.0}}'
 
-# Update multiple fields
+# 更新多個欄位
 databricks postgres update-endpoint \
     projects/my-app/branches/production/endpoints/my-compute \
     "spec.autoscaling_limit_min_cu,spec.autoscaling_limit_max_cu" \
     --json '{"spec": {"autoscaling_limit_min_cu": 2.0, "autoscaling_limit_max_cu": 8.0}}'
 ```
 
-## Deleting a Compute
+## 刪除計算
 
 ```python
 w.postgres.delete_endpoint(
@@ -147,62 +147,62 @@ w.postgres.delete_endpoint(
 ).wait()
 ```
 
-## Autoscaling
+## 自動擴展 (Autoscaling)
 
-Autoscaling dynamically adjusts compute resources based on workload demand.
+自動擴展根據工作負載需求動態調整計算資源。
 
-### Configuration
+### 配置
 
-- **Range:** 0.5-32 CU
-- **Constraint:** Max - Min cannot exceed 8 CU
-- **Valid examples:** 4-8 CU, 8-16 CU, 16-24 CU
-- **Invalid example:** 0.5-32 CU (range of 31.5 CU)
+- **範圍:** 0.5-32 CU
+- **限制:** 最大值 - 最小值不能超過 8 CU
+- **有效範例:** 4-8 CU, 8-16 CU, 16-24 CU
+- **無效範例:** 0.5-32 CU (範圍為 31.5 CU)
 
-### Best Practices
+### 最佳實踐
 
-- Set minimum CU large enough to cache your working set in memory
-- Performance may be degraded until compute scales up and caches data
-- Connection limits are based on the maximum CU in the range
+- 設定足夠大的最小 CU 以將工作集緩存在記憶體中
+- 在計算擴展並緩存資料之前，效能可能會降低
+- 連線限制基於範圍內的最大 CU
 
-## Scale-to-Zero
+## 縮減至零 (Scale-to-Zero)
 
-Automatically suspends compute after a period of inactivity.
+在一段時間不活動後自動暫停計算。
 
-| Setting | Description |
+| 設定 | 描述 |
 |---------|-------------|
-| **Enabled** | Compute suspends after inactivity timeout (saves cost) |
-| **Disabled** | Always-active compute (eliminates wake-up latency) |
+| **已啟用** | 計算在不活動逾時後暫停 (節省成本) |
+| **已停用** | 始終活動的計算 (消除喚醒延遲) |
 
-**Default behavior:**
-- `production` branch: Scale-to-zero **disabled** (always active)
-- Other branches: Scale-to-zero can be configured
+**預設行為：**
+- `production` 分支：縮減至零 **已停用** (始終活動)
+- 其他分支：可以配置縮減至零
 
-**Default inactivity timeout:** 5 minutes
-**Minimum inactivity timeout:** 60 seconds
+**預設不活動逾時：** 5 分鐘
+**最小不活動逾時：** 60 秒
 
-### Wake-up Behavior
+### 喚醒行為
 
-When a connection arrives on a suspended compute:
-1. Compute starts automatically (reactivation takes a few hundred milliseconds)
-2. The connection request is handled transparently once active
-3. Compute restarts at minimum autoscaling size (if autoscaling enabled)
-4. Applications should implement connection retry logic for the brief reactivation period
+當連線到達暫停的計算時：
+1. 計算自動啟動 (重新啟動需要幾百毫秒)
+2. 一旦活動，連線請求將被透明地處理
+3. 計算以最小自動擴展大小重新啟動 (如果啟用了自動擴展)
+4. 應用程式應為短暫的重新啟動期間實作連線重試邏輯
 
-### Session Context After Reactivation
+### 重新啟動後的 Session 上下文
 
-When a compute suspends and reactivates, session context is **reset**:
-- In-memory statistics and cache contents are cleared
-- Temporary tables and prepared statements are lost
-- Session-specific configuration settings reset
-- Connection pools and active transactions are terminated
+當計算暫停並重新啟動時，Session 上下文會被 **重設**：
+- 記憶體中的統計資料和緩存內容被清除
+- 臨時資料表和準備好的語句 (prepared statements) 遺失
+- 特定於 Session 的配置設定重設
+- 連線池和活動事務被終止
 
-If your application requires persistent session data, consider disabling scale-to-zero.
+如果您的應用程式需要持久的 Session 資料，請考慮停用縮減至零。
 
-## Sizing Guidance
+## 大小調整指南
 
-| Factor | Recommendation |
+| 因素 | 建議 |
 |--------|---------------|
-| Query complexity | Complex analytical queries benefit from larger computes |
-| Concurrent connections | More connections need more CPU and memory |
-| Data volume | Larger datasets may need more memory for performance |
-| Response time | Critical apps may require larger computes |
+| 查詢複雜度 | 複雜的分析查詢受益於較大的計算 |
+| 並發連線 | 更多連線需要更多 CPU 和記憶體 |
+| 資料量 | 較大的資料集可能需要更多記憶體以獲得效能 |
+| 回應時間 | 關鍵應用程式可能需要較大的計算 |

@@ -1,37 +1,37 @@
-# MLflow 3 GenAI - GOTCHAS & Common Mistakes
+# MLflow 3 GenAI - 陷阱與常見錯誤 (GOTCHAS & Common Mistakes)
 
-**CRITICAL**: Read this before writing any evaluation code. These are the most common mistakes that will cause failures.
+**關鍵 (CRITICAL)**: 在撰寫任何評估程式碼之前請先閱讀此文。這些是導致失敗的最常見錯誤。
 
-## Table of Contents
+## 目錄
 
-- [Using Model Serving Endpoints for Development](#-wrong-using-model-serving-endpoints-for-development)
-- [Wrong API Imports](#-wrong-api-imports)
-- [Wrong Evaluate Function](#-wrong-evaluate-function)
-- [Wrong Data Format](#-wrong-data-format)
-- [Wrong predict_fn Signature](#-wrong-predict_fn-signature)
-- [Wrong Scorer Decorator Usage](#-wrong-scorer-decorator-usage)
-- [Wrong Feedback Return](#-wrong-feedback-return)
-- [Wrong Guidelines Scorer Setup](#-wrong-guidelines-scorer-setup)
-- [Wrong Trace Search Syntax](#-wrong-trace-search-syntax)
-- [Wrong Expectations Usage](#-wrong-expectations-usage)
-- [Wrong RetrievalGroundedness Usage](#-wrong-retrievalgroundedness-usage)
-- [Wrong Custom Scorer Imports](#-wrong-custom-scorer-imports)
-- [Wrong Type Hints in Scorers](#-wrong-type-hints-in-scorers)
-- [Wrong Dataset Creation](#-wrong-dataset-creation)
-- [Wrong Multiple Feedback Names](#-wrong-multiple-feedback-names)
-- [Wrong Guidelines Context Reference](#-wrong-guidelines-context-reference)
-- [Wrong Production Monitoring Setup](#-wrong-production-monitoring-setup)
-- [Wrong Custom Judge Model Format](#-wrong-custom-judge-model-format)
-- [Wrong Aggregation Values](#-wrong-aggregation-values)
-- [Summary Checklist](#summary-checklist)
+- [在開發中使用 Model Serving 端點 (錯誤)](#-錯誤-在開發中使用-model-serving-端點)
+- [錯誤的 API 匯入](#-錯誤的-api-匯入)
+- [錯誤的 Evaluate 函數](#-錯誤的-evaluate-函數)
+- [錯誤的資料格式](#-錯誤的-資料格式)
+- [錯誤的 predict_fn 簽章](#-錯誤的-predict_fn-簽章)
+- [錯誤的評分器裝飾器用法](#-錯誤的-評分器裝飾器用法)
+- [錯誤的 Feedback 返回](#-錯誤的-feedback-返回)
+- [錯誤的 Guidelines 評分器設定](#-錯誤的-guidelines-評分器設定)
+- [錯誤的追蹤搜尋語法](#-錯誤的-追蹤搜尋語法)
+- [錯誤的 Expectations 用法](#-錯誤的-expectations-用法)
+- [錯誤的 RetrievalGroundedness 用法](#-錯誤的-retrievalgroundedness-用法)
+- [錯誤的自訂評分器匯入](#-錯誤的-自訂評分器匯入)
+- [評分器中錯誤的類型提示](#-評分器中錯誤的類型提示)
+- [錯誤的資料集建立](#-錯誤的-資料集建立)
+- [錯誤的多重 Feedback 名稱](#-錯誤的-多重-feedback-名稱)
+- [錯誤的 Guidelines 上下文引用](#-錯誤的-guidelines-上下文引用)
+- [錯誤的生產監控設定](#-錯誤的-生產監控設定)
+- [錯誤的自訂裁判模型格式](#-錯誤的自訂裁判模型格式)
+- [錯誤的聚合值](#-錯誤的-聚合值)
+- [總結檢查表](#總結檢查表)
 
 ---
 
-## ❌ WRONG: Using Model Serving Endpoints for Development
+## ❌ 錯誤：在開發中使用 Model Serving 端點
 
-### WRONG: Calling deployed endpoint for initial testing
+### 錯誤：呼叫已部署的端點進行初始測試
 ```python
-# ❌ WRONG - Don't use model serving endpoints during development
+# ❌ 錯誤 - 開發期間不要使用 Model Serving 端點
 from databricks.sdk import WorkspaceClient
 
 w = WorkspaceClient()
@@ -45,14 +45,14 @@ def predict_fn(messages):
     return {"response": response.choices[0].message.content}
 ```
 
-### ✅ CORRECT: Import and test agent locally
+### ✅ 正確：在本地匯入並測試代理
 ```python
-# ✅ CORRECT - Import agent directly for fast iteration
-from plan_execute_agent import AGENT  # Your local agent module
+# ✅ 正確 - 直接匯入代理以進行快速迭代
+from plan_execute_agent import AGENT  # 您的本地代理模組
 
 def predict_fn(messages):
     result = AGENT.predict({"messages": messages})
-    # Extract response from ResponsesAgent format
+    # 從 ResponsesAgent 格式提取回應
     if isinstance(result, dict) and "messages" in result:
         for msg in reversed(result["messages"]):
             if msg.get("role") == "assistant":
@@ -60,29 +60,29 @@ def predict_fn(messages):
     return {"response": str(result)}
 ```
 
-**Why?**
-- Local testing enables faster iteration (no deployment needed)
-- Full stack traces for debugging
-- No serving endpoint costs
-- Direct access to agent internals
+**為什麼？**
+- 本地測試可加快迭代速度（無需部署）
+- 完整的堆疊追蹤便於除錯
+- 無服務端點成本
+- 直接存取代理內部
 
-**When to use endpoints**: Only for production monitoring, load testing, or A/B testing deployed versions.
+**何時使用端點**：僅用於生產監控、負載測試或已部署版本的 A/B 測試。
 
 ---
 
-## ❌ WRONG API IMPORTS
+## ❌ 錯誤的 API 匯入
 
-### WRONG: Using old MLflow 2 imports
+### 錯誤：使用舊的 MLflow 2 匯入
 ```python
-# ❌ WRONG - These don't exist in MLflow 3 GenAI
+# ❌ 錯誤 - 這些在 MLflow 3 GenAI 中不存在
 from mlflow.evaluate import evaluate
 from mlflow.metrics import genai
 import mlflow.llm
 ```
 
-### ✅ CORRECT: MLflow 3 GenAI imports
+### ✅ 正確：MLflow 3 GenAI 匯入
 ```python
-# ✅ CORRECT
+# ✅ 正確
 import mlflow.genai
 from mlflow.genai.scorers import Guidelines, Safety, Correctness, scorer
 from mlflow.genai.judges import meets_guidelines, is_correct, make_judge
@@ -91,11 +91,11 @@ from mlflow.entities import Feedback, Trace
 
 ---
 
-## ❌ WRONG EVALUATE FUNCTION
+## ❌ 錯誤的 EVALUATE 函數
 
-### WRONG: Using mlflow.evaluate()
+### 錯誤：使用 mlflow.evaluate()
 ```python
-# ❌ WRONG - This is the old API for classic ML
+# ❌ 錯誤 - 這是用於經典 ML 的舊 API
 results = mlflow.evaluate(
     model=my_model,
     data=eval_data,
@@ -103,9 +103,9 @@ results = mlflow.evaluate(
 )
 ```
 
-### ✅ CORRECT: Using mlflow.genai.evaluate()
+### ✅ 正確：使用 mlflow.genai.evaluate()
 ```python
-# ✅ CORRECT - MLflow 3 GenAI evaluation
+# ✅ 正確 - MLflow 3 GenAI 評估
 results = mlflow.genai.evaluate(
     data=eval_dataset,
     predict_fn=my_app,
@@ -115,19 +115,19 @@ results = mlflow.genai.evaluate(
 
 ---
 
-## ❌ WRONG DATA FORMAT
+## ❌ 錯誤的資料格式
 
-### WRONG: Flat data structure
+### 錯誤：扁平的資料結構
 ```python
-# ❌ WRONG - Missing nested structure
+# ❌ 錯誤 - 缺少巢狀結構
 eval_data = [
     {"query": "What is X?", "expected": "X is..."}
 ]
 ```
 
-### ✅ CORRECT: Proper nested structure
+### ✅ 正確：適當的巢狀結構
 ```python
-# ✅ CORRECT - Must have 'inputs' key
+# ✅ 正確 - 必須有 'inputs' 鍵
 eval_data = [
     {
         "inputs": {"query": "What is X?"},
@@ -138,40 +138,40 @@ eval_data = [
 
 ---
 
-## ❌ WRONG predict_fn SIGNATURE
+## ❌ 錯誤的 predict_fn 簽章
 
-### WRONG: Function expects dict
+### 錯誤：函數期望字典
 ```python
-# ❌ WRONG - predict_fn receives **unpacked inputs
-def my_app(inputs):  # Receives dict
+# ❌ 錯誤 - predict_fn 接收 **unpacked inputs
+def my_app(inputs):  # 接收字典
     query = inputs["query"]
     return {"response": "..."}
 ```
 
-### ✅ CORRECT: Function receives keyword args
+### ✅ 正確：函數接收關鍵字參數
 ```python
-# ✅ CORRECT - inputs are unpacked as kwargs
-def my_app(query, context=None):  # Receives individual keys
+# ✅ 正確 - inputs 被解包為 kwargs
+def my_app(query, context=None):  # 接收個別鍵值
     return {"response": f"Answer to {query}"}
 
-# If inputs = {"query": "What is X?", "context": "..."}
-# Then my_app is called as: my_app(query="What is X?", context="...")
+# 如果 inputs = {"query": "What is X?", "context": "..."}
+# 則 my_app 被呼叫為: my_app(query="What is X?", context="...")
 ```
 
 ---
 
-## ❌ WRONG SCORER DECORATOR USAGE
+## ❌ 錯誤的評分器裝飾器用法
 
-### WRONG: Missing decorator
+### 錯誤：缺少裝飾器
 ```python
-# ❌ WRONG - This won't work as a scorer
+# ❌ 錯誤 - 這將無法作為評分器運作
 def my_scorer(inputs, outputs):
     return True
 ```
 
-### ✅ CORRECT: Use @scorer decorator
+### ✅ 正確：使用 @scorer 裝飾器
 ```python
-# ✅ CORRECT
+# ✅ 正確
 from mlflow.genai.scorers import scorer
 
 @scorer
@@ -181,37 +181,37 @@ def my_scorer(inputs, outputs):
 
 ---
 
-## ❌ WRONG FEEDBACK RETURN
+## ❌ 錯誤的 FEEDBACK 返回
 
-### WRONG: Returning wrong types
+### 錯誤：返回錯誤的類型
 ```python
 @scorer
 def bad_scorer(outputs):
-    # ❌ WRONG - Can't return dict
+    # ❌ 錯誤 - 不能返回字典
     return {"score": 0.5, "reason": "..."}
     
-    # ❌ WRONG - Can't return tuple
+    # ❌ 錯誤 - 不能返回元組
     return (True, "rationale")
 ```
 
-### ✅ CORRECT: Return Feedback or primitive
+### ✅ 正確：返回 Feedback 或基本類型
 ```python
 from mlflow.entities import Feedback
 
 @scorer
 def good_scorer(outputs):
-    # ✅ CORRECT - Return primitive
+    # ✅ 正確 - 返回基本類型
     return True
     return 0.85
     return "yes"
     
-    # ✅ CORRECT - Return Feedback object
+    # ✅ 正確 - 返回 Feedback 物件
     return Feedback(
         value=True,
         rationale="Explanation"
     )
     
-    # ✅ CORRECT - Return list of Feedbacks
+    # ✅ 正確 - 返回 Feedback 列表
     return [
         Feedback(name="metric_1", value=True),
         Feedback(name="metric_2", value=0.9)
@@ -220,79 +220,79 @@ def good_scorer(outputs):
 
 ---
 
-## ❌ WRONG GUIDELINES SCORER SETUP
+## ❌ 錯誤的 GUIDELINES 評分器設定
 
-### WRONG: Missing required parameters
+### 錯誤：缺少必要的參數
 ```python
-# ❌ WRONG - Missing 'name' parameter
+# ❌ 錯誤 - 缺少 'name' 參數
 scorer = Guidelines(guidelines="Must be professional")
 ```
 
-### ✅ CORRECT: Include name and guidelines
+### ✅ 正確：包含 name 和 guidelines
 ```python
-# ✅ CORRECT
+# ✅ 正確
 scorer = Guidelines(
-    name="professional_tone",  # REQUIRED
-    guidelines="The response must be professional"  # REQUIRED
+    name="professional_tone",  # 必填 (REQUIRED)
+    guidelines="The response must be professional"  # 必填 (REQUIRED)
 )
 ```
 
 ---
 
-## ❌ WRONG TRACE SEARCH SYNTAX
+## ❌ 錯誤的追蹤搜尋語法
 
-### WRONG: Missing prefixes and wrong quotes
+### 錯誤：缺少前綴和錯誤引號
 ```python
-# ❌ WRONG - Missing prefix
+# ❌ 錯誤 - 缺少前綴
 mlflow.search_traces("status = 'OK'")
 
-# ❌ WRONG - Using double quotes
+# ❌ 錯誤 - 使用雙引號
 mlflow.search_traces('attributes.status = "OK"')
 
-# ❌ WRONG - Missing backticks for dotted names
+# ❌ 錯誤 - 點號名稱缺少反引號
 mlflow.search_traces("tags.mlflow.traceName = 'my_app'")
 
-# ❌ WRONG - Using OR (not supported)
+# ❌ 錯誤 - 使用 OR (不支援)
 mlflow.search_traces("attributes.status = 'OK' OR attributes.status = 'ERROR'")
 ```
 
-### ✅ CORRECT: Proper filter syntax
+### ✅ 正確：適當的過濾語法
 ```python
-# ✅ CORRECT - Use prefix and single quotes
+# ✅ 正確 - 使用前綴和單引號
 mlflow.search_traces("attributes.status = 'OK'")
 
-# ✅ CORRECT - Backticks for dotted names
+# ✅ 正確 - 點號名稱使用反引號
 mlflow.search_traces("tags.`mlflow.traceName` = 'my_app'")
 
-# ✅ CORRECT - AND is supported
+# ✅ 正確 - 支援 AND
 mlflow.search_traces("attributes.status = 'OK' AND tags.env = 'prod'")
 
-# ✅ CORRECT - Time in milliseconds
+# ✅ 正確 - 時間以毫秒為單位
 import time
-cutoff = int((time.time() - 3600) * 1000)  # 1 hour ago
+cutoff = int((time.time() - 3600) * 1000)  # 1 小時前
 mlflow.search_traces(f"attributes.timestamp_ms > {cutoff}")
 ```
 
 ---
 
-## ❌ WRONG EXPECTATIONS USAGE
+## ❌ 錯誤的 EXPECTATIONS 用法
 
-### WRONG: Using Correctness without expectations
+### 錯誤：使用 Correctness 但無 expectations
 ```python
-# ❌ WRONG - Correctness requires expected_facts or expected_response
+# ❌ 錯誤 - Correctness 需要 expected_facts 或 expected_response
 eval_data = [
     {"inputs": {"query": "What is X?"}}
 ]
 results = mlflow.genai.evaluate(
     data=eval_data,
     predict_fn=my_app,
-    scorers=[Correctness()]  # Will fail - no ground truth!
+    scorers=[Correctness()]  # 會失敗 - 無基本真值！
 )
 ```
 
-### ✅ CORRECT: Include expectations for Correctness
+### ✅ 正確：為 Correctness 包含 expectations
 ```python
-# ✅ CORRECT
+# ✅ 正確
 eval_data = [
     {
         "inputs": {"query": "What is X?"},
@@ -305,39 +305,39 @@ eval_data = [
 
 ---
 
-## ❌ WRONG RetrievalGroundedness USAGE
+## ❌ 錯誤的 RetrievalGroundedness 用法
 
-### WRONG: Using without RETRIEVER span
+### 錯誤：使用時無 RETRIEVER span
 ```python
-# ❌ WRONG - App has no RETRIEVER span type
+# ❌ 錯誤 - App 沒有 RETRIEVER span 類型
 @mlflow.trace
 def my_rag_app(query):
-    docs = get_documents(query)  # Not marked as retriever
+    docs = get_documents(query)  # 未標記為 retriever
     return generate_response(docs, query)
 
-# RetrievalGroundedness will fail - can't find retriever spans
+# RetrievalGroundedness 會失敗 - 找不到 retriever spans
 ```
 
-### ✅ CORRECT: Mark retrieval with proper span type
+### ✅ 正確：使用適當的 span 類型標記檢索
 ```python
-# ✅ CORRECT - Use span_type="RETRIEVER"
+# ✅ 正確 - 使用 span_type="RETRIEVER"
 @mlflow.trace(span_type="RETRIEVER")
 def retrieve_documents(query):
     return [doc1, doc2]
 
 @mlflow.trace
 def my_rag_app(query):
-    docs = retrieve_documents(query)  # Now has RETRIEVER span
+    docs = retrieve_documents(query)  # 現在有 RETRIEVER span
     return generate_response(docs, query)
 ```
 
 ---
 
-## ❌ WRONG CUSTOM SCORER IMPORTS
+## ❌ 錯誤的自訂評分器匯入
 
-### WRONG: External imports at module level
+### 錯誤：模組層級的外部匯入
 ```python
-# ❌ WRONG for production monitoring - external import outside function
+# ❌ 錯誤 - 對於生產監控，外部匯入位於函數外
 import my_custom_library
 
 @scorer
@@ -345,22 +345,22 @@ def production_scorer(outputs):
     return my_custom_library.process(outputs)
 ```
 
-### ✅ CORRECT: Inline imports for production scorers
+### ✅ 正確：生產評分器的行內匯入
 ```python
-# ✅ CORRECT - Import inside function for serialization
+# ✅ 正確 - 在函數內匯入以進行序列化
 @scorer
 def production_scorer(outputs):
-    import json  # Import inside for production monitoring
+    import json  # 用於生產監控，匯入在內部
     return len(json.dumps(outputs)) > 100
 ```
 
 ---
 
-## ❌ WRONG TYPE HINTS IN SCORERS
+## ❌ 評分器中錯誤的類型提示
 
-### WRONG: Type hints requiring imports in signature
+### 錯誤：簽章中需要匯入的類型提示
 ```python
-# ❌ WRONG - Type hints break serialization for production monitoring
+# ❌ 錯誤 - 類型提示破壞生產監控的序列化
 from typing import List
 
 @scorer
@@ -368,14 +368,14 @@ def bad_scorer(outputs: List[str]) -> bool:
     return True
 ```
 
-### ✅ CORRECT: Avoid complex type hints or use dict
+### ✅ 正確：避免複雜的類型提示或使用 dict
 ```python
-# ✅ CORRECT - Simple types work
+# ✅ 正確 - 簡單類型可行
 @scorer
 def good_scorer(outputs):
     return True
 
-# ✅ CORRECT - dict is fine
+# ✅ 正確 - dict 是可以的
 @scorer
 def good_scorer(outputs: dict) -> bool:
     return True
@@ -383,22 +383,22 @@ def good_scorer(outputs: dict) -> bool:
 
 ---
 
-## ❌ WRONG Dataset Creation
+## ❌ 錯誤的資料集建立
 
-### WRONG: Missing Spark session for MLflow datasets
+### 錯誤：MLflow 資料集缺少 Spark session
 ```python
-# ❌ WRONG - Need Spark for MLflow-managed datasets
+# ❌ 錯誤 - MLflow 託管資料集需要 Spark
 import mlflow.genai.datasets
 
 dataset = mlflow.genai.datasets.create_dataset(
     uc_table_name="catalog.schema.my_dataset"
 )
-# Error: No Spark session available
+# 錯誤: 無可用的 Spark session
 ```
 
-### ✅ CORRECT: Initialize Spark first
+### ✅ 正確：先初始化 Spark
 ```python
-# ✅ CORRECT
+# ✅ 正確
 from databricks.connect import DatabricksSession
 
 spark = DatabricksSession.builder.remote(serverless=True).getOrCreate()
@@ -410,24 +410,24 @@ dataset = mlflow.genai.datasets.create_dataset(
 
 ---
 
-## ❌ WRONG Multiple Feedback Names
+## ❌ 錯誤的多重 Feedback 名稱
 
-### WRONG: Multiple feedbacks without unique names
+### 錯誤：多重 feedbacks 無唯一名稱
 ```python
 @scorer
 def bad_multi_scorer(outputs):
-    # ❌ WRONG - Feedbacks will conflict
+    # ❌ 錯誤 - Feedbacks 會衝突
     return [
         Feedback(value=True),
         Feedback(value=0.8)
     ]
 ```
 
-### ✅ CORRECT: Unique names for each Feedback
+### ✅ 正確：為每個 Feedback 使用唯一名稱
 ```python
 @scorer
 def good_multi_scorer(outputs):
-    # ✅ CORRECT - Each has unique name
+    # ✅ 正確 - 每個都有唯一名稱
     return [
         Feedback(name="check_1", value=True),
         Feedback(name="check_2", value=0.8)
@@ -436,20 +436,20 @@ def good_multi_scorer(outputs):
 
 ---
 
-## ❌ WRONG Guidelines Context Reference
+## ❌ 錯誤的 Guidelines 上下文引用
 
-### WRONG: Wrong variable names in guidelines
+### 錯誤：準則中使用錯誤的變數名稱
 ```python
-# ❌ WRONG - Guidelines use 'request' and 'response', not custom keys
+# ❌ 錯誤 - Guidelines 使用 'request' 和 'response'，而非自訂鍵值
 Guidelines(
     name="check",
-    guidelines="The output must address the query"  # 'output' and 'query' not available
+    guidelines="The output must address the query"  # 'output' 和 'query' 不可用
 )
 ```
 
-### ✅ CORRECT: Use 'request' and 'response'
+### ✅ 正確：使用 'request' 和 'response'
 ```python
-# ✅ CORRECT - These are auto-extracted
+# ✅ 正確 - 這些是自動提取的
 Guidelines(
     name="check",
     guidelines="The response must address the request"
@@ -458,20 +458,20 @@ Guidelines(
 
 ---
 
-## ❌ WRONG Production Monitoring Setup
+## ❌ 錯誤的生產監控設定
 
-### WRONG: Forgetting to start after register
+### 錯誤：註冊後忘記啟動
 ```python
-# ❌ WRONG - Registered but not started
+# ❌ 錯誤 - 已註冊但未啟動
 from mlflow.genai.scorers import Safety
 
 safety = Safety().register(name="safety_check")
-# Scorer exists but isn't running!
+# 評分器存在但未執行！
 ```
 
-### ✅ CORRECT: Register then start
+### ✅ 正確：註冊然後啟動
 ```python
-# ✅ CORRECT - Both register and start
+# ✅ 正確 - 同時註冊和啟動
 from mlflow.genai.scorers import Safety, ScorerSamplingConfig
 
 safety = Safety().register(name="safety_check")
@@ -482,66 +482,66 @@ safety = safety.start(
 
 ---
 
-## ❌ WRONG Custom Judge Model Format
+## ❌ 錯誤的自訂裁判模型格式
 
-### WRONG: Wrong model format
+### 錯誤：錯誤的模型格式
 ```python
-# ❌ WRONG - Missing provider prefix
+# ❌ 錯誤 - 缺少提供者前綴
 Guidelines(name="test", guidelines="...", model="gpt-4o")
 
-# ❌ WRONG - Wrong separator
+# ❌ 錯誤 - 錯誤的分隔符
 Guidelines(name="test", guidelines="...", model="databricks:gpt-4o")
 ```
 
-### ✅ CORRECT: Use provider:/model format
+### ✅ 正確：使用 provider:/model 格式
 ```python
-# ✅ CORRECT - Use :/ separator
+# ✅ 正確 - 使用 :/ 分隔符
 Guidelines(name="test", guidelines="...", model="databricks:/my-endpoint")
 Guidelines(name="test", guidelines="...", model="openai:/gpt-4o")
 ```
 
 ---
 
-## ❌ WRONG Aggregation Values
+## ❌ 錯誤的聚合值
 
-### WRONG: Invalid aggregation names
+### 錯誤：無效的聚合名稱
 ```python
-# ❌ WRONG - p50, p99, sum are not valid
+# ❌ 錯誤 - p50, p99, sum 不是有效的
 @scorer(aggregations=["mean", "p50", "p99", "sum"])
 def my_scorer(outputs) -> float:
     return 0.5
 ```
 
-### ✅ CORRECT: Use valid aggregation names
+### ✅ 正確：使用有效的聚合名稱
 ```python
-# ✅ CORRECT - Only these 6 are valid
+# ✅ 正確 - 只有這 6 個是有效的
 @scorer(aggregations=["min", "max", "mean", "median", "variance", "p90"])
 def my_scorer(outputs) -> float:
     return 0.5
 ```
 
-**Valid aggregations:**
-- `min` - minimum value
-- `max` - maximum value
-- `mean` - average value
-- `median` - 50th percentile (NOT `p50`)
-- `variance` - statistical variance
-- `p90` - 90th percentile (only p90, NOT p50 or p99)
+**有效的聚合:**
+- `min` - 最小值
+- `max` - 最大值
+- `mean` - 平均值
+- `median` - 第 50 百分位數 (不是 `p50`)
+- `variance` - 統計變異數
+- `p90` - 第 90 百分位數 (只有 p90，不是 p50 或 p99)
 
 ---
 
-## Summary Checklist
+## 總結檢查表
 
-Before running evaluation, verify:
+執行評估前，請驗證：
 
-- [ ] Using `mlflow.genai.evaluate()` (not `mlflow.evaluate()`)
-- [ ] Data has `inputs` key (nested structure)
-- [ ] `predict_fn` accepts **unpacked kwargs (not dict)
-- [ ] Scorers have `@scorer` decorator
-- [ ] Guidelines have both `name` and `guidelines`
-- [ ] Correctness has `expectations.expected_facts` or `expected_response`
-- [ ] RetrievalGroundedness has `RETRIEVER` span in trace
-- [ ] Trace filters use `attributes.` prefix and single quotes
-- [ ] Production scorers have inline imports
-- [ ] Multiple Feedbacks have unique names
-- [ ] Aggregations use valid names: min, max, mean, median, variance, p90
+- [ ] 使用 `mlflow.genai.evaluate()` (不是 `mlflow.evaluate()`)
+- [ ] 資料有 `inputs` 鍵 (巢狀結構)
+- [ ] `predict_fn` 接收 **unpacked kwargs (不是字典)
+- [ ] 評分器有 `@scorer` 裝飾器
+- [ ] Guidelines 同時有 `name` 和 `guidelines`
+- [ ] Correctness 有 `expectations.expected_facts` 或 `expected_response`
+- [ ] RetrievalGroundedness 在已追蹤中有 `RETRIEVER` span
+- [ ] 追蹤過濾器使用 `attributes.` 前綴和單引號
+- [ ] 生產評分器有行內匯入
+- [ ] 多個 Feedbacks 有唯一名稱
+- [ ] 聚合使用有效名稱：min, max, mean, median, variance, p90

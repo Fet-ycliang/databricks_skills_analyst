@@ -1,18 +1,18 @@
 ---
 name: stream-static-joins
-description: Enrich streaming data with Delta dimension tables in real-time. Use when joining fast-moving streaming events with slowly-changing reference data (device dimensions, user profiles, product catalogs), implementing real-time data enrichment, or adding context to streaming events without state management overhead.
+description: 以即時方式使用 Delta 維度資料表豐富串流資料。適用於將快速變動的串流事件與緩慢變更的參考資料 (裝置維度、使用者設定檔、產品目錄) 進行關聯、實作即時資料豐富化，或在無狀態管理開銷的情況下為串流事件添加上下文。
 ---
 
-# Stream-Static Joins
+# 串流靜態關聯 (Stream-Static Joins)
 
-Enrich streaming data with slowly-changing reference data stored in Delta tables. Stream-static joins are stateless and automatically refresh dimension data each microbatch.
+使用儲存在 Delta 資料表中的緩慢變更參考資料來豐富串流資料。串流靜態關聯是無狀態的，並且會在每個微批次中自動重新整理維度資料。
 
-## Quick Start
+## 快速入門 (Quick Start)
 
 ```python
 from pyspark.sql.functions import col, from_json
 
-# Streaming source (IoT events from Kafka)
+# 串流來源 (來自 Kafka 的 IoT 事件)
 iot_stream = (spark
     .readStream
     .format("kafka")
@@ -23,14 +23,14 @@ iot_stream = (spark
     .select("data.*")
 )
 
-# Static Delta dimension table (refreshes each microbatch)
+# 靜態 Delta 維度資料表 (每個微批次重新整理)
 device_dim = spark.table("device_dimensions")
 
-# Enrich streaming data with left join (recommended)
+# 使用 Left Join 豐富串流資料 (推薦)
 enriched = iot_stream.join(
     device_dim,
     "device_id",
-    "left"  # Preserves all streaming events
+    "left"  # 保留所有串流事件
 ).select(
     iot_stream["*"],
     device_dim["device_type"],
@@ -39,7 +39,7 @@ enriched = iot_stream.join(
     device_dim["updated_at"].alias("dim_updated_at")
 )
 
-# Write enriched data
+# 寫入豐富化後的資料
 query = (enriched
     .writeStream
     .format("delta")
@@ -50,41 +50,41 @@ query = (enriched
 )
 ```
 
-## Core Concepts
+## 核心概念 (Core Concepts)
 
-### Why Delta Tables Matter
+### 為何 Delta 資料表很重要
 
-Delta tables enable automatic version checking each microbatch:
+Delta 資料表能在每個微批次自動檢查版本：
 
 ```python
-# Delta table: Version checked every microbatch
-device_dim = spark.table("device_dimensions")  # Reads latest version automatically
+# Delta table: 每個微批次檢查版本
+device_dim = spark.table("device_dimensions")  # 自動讀取最新版本
 
-# Non-Delta format: Read once at startup (truly static)
-device_dim = spark.read.parquet("/path/to/devices")  # No refresh
+# Non-Delta format: 啟動時讀取一次 (真正的靜態)
+device_dim = spark.read.parquet("/path/to/devices")  # 不會重新整理
 ```
 
-**Key Insight**: Delta's versioning ensures each microbatch gets the latest dimension data without manual refresh.
+**關鍵見解**: Delta 的版本控制確保每個微批次都能取得最新的維度資料，無需手動重新整理。
 
-### Join Types and Production Use
+### 關聯類型與生產用途
 
-| Join Type | Behavior | Production Use |
+| 關聯類型 | 行為 | 生產用途 |
 |-----------|----------|----------------|
-| **Left** | Preserves all stream events | ✅ Recommended - prevents data loss |
-| **Inner** | Drops unmatched events | ⚠️ Risk of data loss - avoid in production |
-| **Right** | Preserves all dimension rows | Rarely used |
-| **Full** | Preserves both sides | Rarely used |
+| **Left** | 保留所有串流事件 | ✅ 推薦 - 防止資料遺失 |
+| **Inner** | 丟棄未匹配事件 | ⚠️ 資料遺失風險 - 生產環境應避免 |
+| **Right** | 保留所有維度資料列 | 很少使用 |
+| **Full** | 保留雙方資料 | 很少使用 |
 
-**Production Rule**: Always use left join to prevent dropping valid streaming events.
+**生產規則**: 始終使用 Left Join 以防止丟棄有效的串流事件。
 
-## Common Patterns
+## 常見模式 (Common Patterns)
 
-### Pattern 1: Basic Device Enrichment
+### 模式 1: 基本裝置豐富化
 
-Enrich IoT events with device metadata:
+使用裝置中繼資料豐富 IoT 事件：
 
 ```python
-# Streaming IoT events
+# 串流 IoT 事件
 iot_stream = (spark
     .readStream
     .format("kafka")
@@ -94,10 +94,10 @@ iot_stream = (spark
     .select("data.*")
 )
 
-# Device dimension table
+# 裝置維度資料表
 device_dim = spark.table("device_dimensions")
 
-# Left join to preserve all events
+# Left join 以保留所有事件
 enriched = iot_stream.join(
     device_dim,
     "device_id",
@@ -115,17 +115,17 @@ enriched.writeStream \
     .start("/delta/enriched_events")
 ```
 
-### Pattern 2: Multi-Table Enrichment
+### 模式 2: 多資料表豐富化
 
-Chain multiple dimension joins:
+串連多個維度關聯：
 
 ```python
-# Multiple dimension tables
+# 多個維度資料表
 devices = spark.table("device_dimensions")
 locations = spark.table("location_dimensions")
 categories = spark.table("category_dimensions")
 
-# Chain joins (each is stateless)
+# 串連 joins (每個都是無狀態的)
 enriched = (iot_stream
     .join(devices, "device_id", "left")
     .join(locations, "location_id", "left")
@@ -140,35 +140,35 @@ enriched = (iot_stream
     )
 )
 
-# Each join refreshes independently each microbatch
+# 每個 join 在每個微批次都會獨立重新整理
 ```
 
-### Pattern 3: Broadcast Hash Join Optimization
+### 模式 3: 廣播雜湊關聯 (Broadcast Hash Join) 優化
 
-Optimize joins by ensuring broadcast:
+透過確保 Broadcast 來優化關聯：
 
 ```python
 from pyspark.sql.functions import broadcast
 
-# Option 1: Select only needed columns
+# 選項 1: 僅選取所需欄位
 small_dim = device_dim.select("device_id", "device_type", "location")
 
-# Option 2: Filter to active records
+# 選項 2: 過濾至有效記錄
 active_dim = device_dim.filter(col("status") == "active")
 
-# Option 3: Force broadcast hint
+# 選項 3: 強制 Broadcast Hint
 enriched = iot_stream.join(
     broadcast(active_dim),
     "device_id",
     "left"
 )
 
-# Verify in Spark UI: Look for "BroadcastHashJoin" in query plan
+# 在 Spark UI 驗證: 在查詢計畫中尋找 "BroadcastHashJoin"
 ```
 
-### Pattern 4: Audit Dimension Freshness
+### 模式 4: 稽核維度新鮮度
 
-Track how fresh dimension data is:
+追蹤維度資料的新鮮程度：
 
 ```python
 from pyspark.sql.functions import unix_timestamp, current_timestamp
@@ -182,32 +182,32 @@ enriched = (iot_stream
     )
     .withColumn(
         "dim_fresh",
-        col("dim_lag_seconds") < 3600  # Less than 1 hour old
+        col("dim_lag_seconds") < 3600  # 小於 1 小時
     )
 )
 
-# Monitor: Alert if dim_lag_seconds > threshold
-# Use for data quality checks
+# 監控: 若 dim_lag_seconds > 閾值則發出警報
+# 用於資料品質檢查
 ```
 
-### Pattern 5: Time-Travel Dimension Lookup
+### 模式 5: 時間旅行維度查找 (Time-Travel Dimension Lookup)
 
-Join with dimension as-of event time:
+以事件發生的時間點與維度進行關聯：
 
 ```python
 from delta import DeltaTable
 
 def enrich_with_time_travel(batch_df, batch_id):
-    """Enrich with dimension version at event time"""
+    """使用事件發生當下的維度版本進行豐富化"""
     from pyspark.sql.functions import max as spark_max
     
-    # Get latest dimension version
+    # 取得最新維度版本
     latest_version = DeltaTable.forName(spark, "device_dimensions") \
         .history() \
         .select(spark_max("version").alias("max_version")) \
         .first()[0]
     
-    # Read dimension at specific version
+    # 讀取特定版本的維度
     dim_at_version = (spark
         .read
         .format("delta")
@@ -215,10 +215,10 @@ def enrich_with_time_travel(batch_df, batch_id):
         .table("device_dimensions")
     )
     
-    # Join with batch
+    # 與批次進行 Join
     enriched = batch_df.join(dim_at_version, "device_id", "left")
     
-    # Write
+    # 寫入
     (enriched
         .write
         .format("delta")
@@ -234,12 +234,12 @@ iot_stream.writeStream \
     .start()
 ```
 
-### Pattern 6: Backfill Missing Dimensions
+### 模式 6: 回填缺失維度
 
-Daily job to fix null dimensions from left join:
+每日排程作業修復 Left Join 產生的 Null 維度：
 
 ```python
-# Daily batch job to backfill missing dimensions
+# 每日批次作業回填缺失維度
 spark.sql("""
     MERGE INTO enriched_events target
     USING device_dimensions source
@@ -253,22 +253,22 @@ spark.sql("""
             dim_updated_at = source.updated_at
 """)
 
-# Run after dimension table updates
-# Fixes events that arrived before dimension was available
+# 在維度表更新後執行
+# 修復在維度可用前就到達的事件
 ```
 
-### Pattern 7: Dimension Change Detection
+### 模式 7: 維度變更偵測
 
-Stream that reacts to dimension changes:
+對維度變更做出反應的串流：
 
 ```python
 def update_reference_cache(batch_df, batch_id):
-    """Update in-memory cache when dimension changes"""
-    # Dimension table changed
-    # Update application cache or notify downstream systems
+    """當維度變更時更新記憶體快取"""
+    # 維度表已變更
+    # 更新應用程式快取或通知下游系統
     pass
 
-# Stream dimension table changes
+# 串流維度表的變更
 dim_changes = (spark
     .readStream
     .format("delta")
@@ -280,35 +280,35 @@ dim_changes = (spark
 )
 ```
 
-## Performance Optimization
+## 效能優化 (Performance Optimization)
 
-### Checklist
+### 檢核清單
 
-- [ ] Dimension table < 100MB for broadcast (or increase threshold)
-- [ ] Select only needed columns before join
-- [ ] Filter dimension to active records only
-- [ ] Verify "BroadcastHashJoin" in query plan
-- [ ] Partition size 100-200MB in memory
-- [ ] Use same region for compute and storage
+- [ ] 維度表 < 100MB 適合 Broadcast (或提高閾值)
+- [ ] Join 前僅選取所需欄位
+- [ ] 僅過濾維度至有效記錄
+- [ ] 驗證查詢計畫中的 "BroadcastHashJoin"
+- [ ] 分區大小在記憶體中約 100-200MB
+- [ ] 運算與儲存使用相同區域
 
-### Configuration
+### 設定 (Configuration)
 
 ```python
-# Increase broadcast threshold if dimension is larger
+# 若維度較大，提高 Broadcast 閾值
 spark.conf.set("spark.sql.autoBroadcastJoinThreshold", "1g")
 
-# Control partition size
+# 控制分區大小
 spark.conf.set("spark.sql.shuffle.partitions", "200")
 
-# Optimize dimension table reads
+# 優化維度表讀取
 spark.conf.set("spark.databricks.delta.optimizeWrite.enabled", "true")
 spark.conf.set("spark.databricks.delta.autoCompact.enabled", "true")
 ```
 
-### Reduce Dimension Size
+### 減少維度大小
 
 ```python
-# Before join: Select only needed columns
+# Join 前: 僅選取所需欄位
 small_dim = device_dim.select(
     "device_id",
     "device_type",
@@ -316,19 +316,19 @@ small_dim = device_dim.select(
     "status"
 )
 
-# Filter to active records
+# 過濾至有效記錄
 active_dim = small_dim.filter(col("status") == "active")
 
-# Join with smaller dimension
+# 使用較小的維度進行 Join
 enriched = iot_stream.join(active_dim, "device_id", "left")
 ```
 
-## Monitoring
+## 監控 (Monitoring)
 
-### Key Metrics
+### 關鍵指標 (Key Metrics)
 
 ```python
-# Null rate (left join quality)
+# 空值率 (Left Join 品質)
 spark.sql("""
     SELECT 
         date_trunc('hour', timestamp) as hour,
@@ -341,7 +341,7 @@ spark.sql("""
     ORDER BY 1 DESC
 """)
 
-# Dimension freshness
+# 維度新鮮度
 spark.sql("""
     SELECT 
         date_trunc('hour', timestamp) as hour,
@@ -355,10 +355,10 @@ spark.sql("""
 """)
 ```
 
-### Programmatic Monitoring
+### 程式化監控
 
 ```python
-# Monitor stream health
+# 監控串流健康狀態
 for stream in spark.streams.active:
     status = stream.status
     progress = stream.lastProgress
@@ -370,43 +370,43 @@ for stream in spark.streams.active:
         print(f"Batch duration: {progress.get('durationMs', {}).get('triggerExecution', 0)} ms")
 ```
 
-### Spark UI Checks
+### Spark UI 檢查
 
-- **Streaming Tab**: Input rate vs processing rate (processing must exceed input)
-- **SQL Tab**: Look for "BroadcastHashJoin" (not "SortMergeJoin")
-- **Jobs Tab**: Check for shuffle operations (should be minimal)
-- **Stages Tab**: Verify partition sizes (100-200MB target)
+- **Streaming Tab**: Input rate vs processing rate (Processing 必須超過 Input)
+- **SQL Tab**: 尋找 "BroadcastHashJoin" (而非 "SortMergeJoin")
+- **Jobs Tab**: 檢查 Shuffle 操作 (應極少)
+- **Stages Tab**: 驗證分區大小 (目標 100-200MB)
 
-## Common Issues
+## 常見問題 (Common Issues)
 
-| Issue | Cause | Solution |
+| 問題 | 原因 | 解決方案 |
 |-------|-------|----------|
-| **Data loss** | Inner join dropping unmatched events | Switch to left join |
-| **Slow joins** | Shuffle join instead of broadcast | Reduce dimension size; force broadcast |
-| **Stale data** | Non-Delta format | Convert dimension table to Delta |
-| **Memory issues** | Large dimension table | Filter before join; increase broadcast threshold |
-| **Skewed joins** | Hot keys in dimension | Salt the join key or partition dimension table |
-| **High null rate** | Dimension updates lagging | Monitor dimension freshness; backfill job |
+| **資料遺失** | Inner Join 丟棄未匹配事件 | 切換至 Left Join |
+| **Join 緩慢** | 使用 Shuffle Join 而非 Broadcast | 減少維度大小; 強制 Broadcast |
+| **資料過舊** | 非 Delta 格式 | 將維度表轉換為 Delta |
+| **記憶體問題** | 維度表過大 | Join 前過濾; 提高 Broadcast 閾值 |
+| **Join 傾斜** | 維度中有熱點鍵值 | 關聯鍵加鹽 (Salt) 或對維度表分區 |
+| **高空值率** | 維度更新延遲 | 監控維度新鮮度; 回填作業 |
 
-## Production Best Practices
+## 生產最佳實踐 (Production Best Practices)
 
-### Always Use Left Join
+### 始終使用 Left Join
 
 ```python
-# WRONG: Inner join loses data
+# 錯誤: Inner Join 會遺失資料
 enriched = iot_stream.join(device_dim, "device_id", "inner")
 
-# CORRECT: Left join preserves all events
+# 正確: Left Join 保留所有事件
 enriched = iot_stream.join(device_dim, "device_id", "left")
 
-# Why? New devices may send data before dimension table is updated
-# Left join preserves events; backfill dimensions later
+# 原因? 新裝置可能在維度表更新前就傳送資料
+# Left Join 保留事件; 稍後再回填維度
 ```
 
-### Handle Null Dimensions
+### 處理 Null 維度
 
 ```python
-# Add null handling in transformations
+# 在轉換中處理 Null
 enriched = (iot_stream
     .join(device_dim, "device_id", "left")
     .withColumn(
@@ -419,18 +419,18 @@ enriched = (iot_stream
     )
 )
 
-# Or flag for manual review
+# 或標記以供人工審閱
 enriched = enriched.withColumn(
     "needs_review",
     col("device_type").isNull()
 )
 ```
 
-### Idempotent Writes
+### 冪等寫入 (Idempotent Writes)
 
 ```python
 def idempotent_write(batch_df, batch_id):
-    """Write with transaction version for idempotency"""
+    """具備交易版本的冪等寫入"""
     (batch_df
         .write
         .format("delta")
@@ -446,74 +446,74 @@ enriched.writeStream \
     .start()
 ```
 
-## Production Checklist
+## 生產檢核清單 (Production Checklist)
 
-- [ ] Left join used (not inner join)
-- [ ] Dimension table is Delta format
-- [ ] Broadcast hash join verified in query plan
-- [ ] Dimension size optimized (< 100MB or threshold increased)
-- [ ] Null rate monitored and alerts configured
-- [ ] Dimension freshness tracked
-- [ ] Backfill job scheduled for missing dimensions
-- [ ] Checkpoint location is unique per query
-- [ ] Idempotent writes configured (txnVersion/txnAppId)
-- [ ] Performance metrics tracked (input rate, batch duration)
+- [ ] 使用 Left Join (非 Inner Join)
+- [ ] 維度表為 Delta 格式
+- [ ] 驗證查詢計畫中的 Broadcast Hash Join
+- [ ] 維度大小優化 (< 100MB 或提高閾值)
+- [ ] 監控空值率並設定警報
+- [ ] 追蹤維度新鮮度
+- [ ] 排程回填作業以處理缺失維度
+- [ ] 每個查詢使用唯一檢查點位置
+- [ ] 設定冪等寫入 (txnVersion/txnAppId)
+- [ ] 追蹤效能指標 (Input rate, Batch duration)
 
-## Expert Tips
+## 專家提示 (Expert Tips)
 
-### Delta Version Checking
+### Delta 版本檢查
 
-Delta tables automatically refresh each microbatch by checking the latest version:
+Delta 資料表透過檢查最新版本，自動在每個微批次重新整理：
 
 ```python
-# Each microbatch:
-# 1. Spark checks Delta table version
-# 2. Reads latest version if changed
-# 3. Uses cached version if unchanged
-# 4. No manual refresh needed
+# 每個微批次:
+# 1. Spark 檢查 Delta 資料表版本
+# 2. 若有變更則讀取最新版本
+# 3. 若無變更則使用快取版本
+# 4. 無需手動重新整理
 
-# This is why Delta tables work better than Parquet for dimensions
-# Parquet: Read once at startup (truly static)
-# Delta: Version checked each microbatch (semi-static)
+# 這就是為何 Delta 資料表比 Parquet 更適合做維度表
+# Parquet: 啟動時讀取一次 (真正的靜態)
+# Delta: 每個微批次檢查版本 (半靜態)
 ```
 
-### Broadcast Join Verification
+### 驗證 Broadcast Join
 
-Always verify broadcast joins in production:
+始終在生產環境驗證 Broadcast Joins：
 
 ```python
-# Check query plan
+# 檢查查詢計畫
 enriched.explain(extended=True)
 
-# Look for:
-# - BroadcastHashJoin ✅ (fast, no shuffle)
-# - SortMergeJoin ⚠️ (slower, requires shuffle)
+# 尋找:
+# - BroadcastHashJoin ✅ (快, 無 shuffle)
+# - SortMergeJoin ⚠️ (慢, 需要 shuffle)
 
-# If seeing SortMergeJoin:
-# 1. Reduce dimension size (select columns, filter rows)
-# 2. Increase broadcast threshold
-# 3. Force broadcast hint
+# 若看到 SortMergeJoin:
+# 1. 減少維度大小 (選取欄位, 過濾資料列)
+# 2. 提高 Broadcast 閾值
+# 3. 強制 Broadcast Hint
 ```
 
-### Dimension Table Optimization
+### 維度資料表優化
 
-Optimize dimension tables for streaming joins:
+優化維度資料表以利串流關聯：
 
 ```python
-# 1. Use Z-order or liquid clustering on join key
+# 1. 對 Join Key 使用 Z-order 或 Liquid Clustering
 spark.sql("""
     OPTIMIZE device_dimensions
     ZORDER BY (device_id)
 """)
 
-# 2. Keep dimension tables small (< 100MB ideal)
-# 3. Use Delta for automatic version checking
-# 4. Partition by frequently filtered columns
+# 2. 保持維度表小巧 (理想 < 100MB)
+# 3. 使用 Delta 以獲得自動版本檢查
+# 4. 依常過濾的欄位進行分區
 ```
 
-## Related Skills
+## 相關技能 (Related Skills)
 
-- `stream-stream-joins` - Join two streaming sources with state management
-- `kafka-to-delta` - Kafka ingestion patterns
-- `write-multiple-tables` - Fan-out patterns for multiple sinks
-- `checkpoint-best-practices` - Checkpoint configuration and management
+- `stream-stream-joins` - 關聯兩個具備狀態管理的串流來源
+- `kafka-to-delta` - Kafka 攝取模式
+- `write-multiple-tables` - 多重目標的扇出模式
+- `checkpoint-best-practices` - 檢查點設定與管理

@@ -1,39 +1,39 @@
-# Python API: Modern vs Legacy
+# Python API: 現代化 vs 舊版 (Modern vs Legacy)
 
-**Last Updated**: January 2026
-**Status**: Modern API (`pyspark.pipelines`) recommended for all new projects
-
----
-
-## Overview
-
-Databricks provides two Python APIs for Spark Declarative Pipelines:
-
-1. **Modern API** (`pyspark.pipelines` as `dp`) - **Recommended (2025)**
-2. **Legacy API** (`dlt`) - Older Delta Live Tables API, still supported
-
-**Key Recommendation**: Always use **modern API** for new projects. Only use legacy for maintaining existing DLT code.
+**最後更新**: 2026 年 1 月
+**狀態**: 對於所有新專案，推薦使用現代化 API (`pyspark.pipelines`)
 
 ---
 
-## Quick Comparison
+## 概述
 
-| Aspect | Modern (`dp`) | Legacy (`dlt`) |
+Databricks 為 Spark Declarative Pipelines 提供兩種 Python API：
+
+1.  **現代化 API (Modern API)** (`pyspark.pipelines` as `dp`) - **推薦 (2025)**
+2.  **舊版 API (Legacy API)** (`dlt`) - 舊的 Delta Live Tables API，仍受支援
+
+**關鍵建議**: 新專案務必使用 **現代化 API**。僅在維護現有 DLT 程式碼時使用舊版。
+
+---
+
+## 快速比較
+
+| 面向 | 現代化 (`dp`) | 舊版 (`dlt`) |
 |--------|---------------|----------------|
-| **Import** | `from pyspark import pipelines as dp` | `import dlt` |
-| **Status** | ✅ **Recommended** | ⚠️ Legacy |
-| **Table decorator** | `@dp.table()` | `@dlt.table()` |
-| **Read** | `spark.read.table("table")` | `dlt.read("table")` |
+| **匯入** | `from pyspark import pipelines as dp` | `import dlt` |
+| **狀態** | ✅ **推薦** | ⚠️ Legacy |
+| **資料表裝飾器** | `@dp.table()` | `@dlt.table()` |
+| **讀取** | `spark.read.table("table")` | `dlt.read("table")` |
 | **CDC/SCD** | `dp.create_auto_cdc_flow()` | `dlt.apply_changes()` |
-| **Use for** | New projects | Maintaining existing |
+| **適用於** | 新專案 | 維護現有專案 |
 
 ---
 
-## Side-by-Side Examples
+## 對照範例
 
-### Basic Table Definition
+### 基本資料表定義
 
-**Modern (Recommended)**:
+**現代化 (推薦)**:
 ```python
 from pyspark import pipelines as dp
 from pyspark.sql import functions as F
@@ -48,7 +48,7 @@ def bronze_events():
     )
 ```
 
-**Legacy**:
+**舊版**:
 ```python
 import dlt
 from pyspark.sql import functions as F
@@ -63,53 +63,53 @@ def bronze_events():
     )
 ```
 
-### Reading Tables
+### 讀取資料表
 
-**Modern (Recommended)**:
+**現代化 (推薦)**:
 ```python
 @dp.table(name="silver_events")
 def silver_events():
-    # Explicit Unity Catalog path
+    # 明確的 Unity Catalog 路徑
     return spark.read.table("bronze_events").filter(...)
 ```
 
-**Legacy**:
+**舊版**:
 ```python
 @dlt.table(name="silver_events")
 def silver_events():
-    # Implicit LIVE schema
+    # 隱含 LIVE schema
     return dlt.read("bronze_events").filter(...)
 ```
 
-**Key Difference**: Modern uses explicit UC paths, legacy uses implicit `LIVE.*`.
+**關鍵差異**: 現代化使用明確 UC 路徑，舊版使用隱含 `LIVE.*`。
 
-### Streaming Reads
+### 串流讀取
 
-**Modern (Recommended)**:
+**現代化 (推薦)**:
 ```python
 @dp.table(name="silver_events")
 def silver_events():
-    # Context-aware (no separate read_stream)
+    # 具備 Context 感知 (無獨立 read_stream)
     return (
         spark.readStream.table("catalog.schema.bronze_events")
         .filter(F.col("event_type").isNotNull())
     )
 ```
 
-**Legacy**:
+**舊版**:
 ```python
 @dlt.table(name="silver_events")
 def silver_events():
-    # Explicit streaming read
+    # 明確串流讀取
     return (
         dlt.read_stream("bronze_events")
         .filter(F.col("event_type").isNotNull())
     )
 ```
 
-### Data Quality Expectations
+### 資料品質預期 (Data Quality Expectations)
 
-**Modern (Recommended)**:
+**現代化 (推薦)**:
 ```python
 @dp.table(name="silver_validated")
 @dp.expect_or_drop("valid_id", "id IS NOT NULL")
@@ -119,7 +119,7 @@ def silver_validated():
     return spark.read.table("catalog.schema.bronze_events")
 ```
 
-**Legacy**:
+**舊版**:
 ```python
 @dlt.table(name="silver_validated")
 @dlt.expect_or_drop("valid_id", "id IS NOT NULL")
@@ -129,11 +129,11 @@ def silver_validated():
     return dlt.read("bronze_events")
 ```
 
-**Note**: Expectations API identical between versions.
+**注意**: 版本間的 Expectations API 相同。
 
 ### SCD Type 2 (AUTO CDC)
 
-**Modern (Recommended)**:
+**現代化 (推薦)**:
 ```python
 from pyspark.sql.functions import col
 
@@ -149,7 +149,7 @@ dp.create_auto_cdc_flow(
 )
 ```
 
-**Legacy**:
+**舊版**:
 ```python
 dlt.create_streaming_table("customers_history")
 
@@ -163,11 +163,11 @@ dlt.apply_changes(
 )
 ```
 
-**Key Difference**: Modern uses `create_auto_cdc_flow()`, legacy uses `apply_changes()`.
+**關鍵差異**: 現代化使用 `create_auto_cdc_flow()`，舊版使用 `apply_changes()`。
 
 ### Liquid Clustering
 
-**Modern (Recommended)**:
+**現代化 (推薦)**:
 ```python
 @dp.table(
     name="bronze_events",
@@ -181,7 +181,7 @@ def bronze_events():
     return spark.readStream.format("cloudFiles").load("/data")
 ```
 
-**Legacy**:
+**舊版**:
 ```python
 @dlt.table(
     name="bronze_events",
@@ -189,75 +189,75 @@ def bronze_events():
         "pipelines.autoOptimize.managed": "true",
         "pipelines.autoOptimize.zOrderCols": "event_type"
     },
-    partition_cols=["event_date"]  # Legacy partitioning
+    partition_cols=["event_date"]  # 舊版分區
 )
 def bronze_events():
     return spark.readStream.format("cloudFiles").load("/data")
 ```
 
-**Key Difference**: Modern supports `cluster_by` for Liquid Clustering.
+**關鍵差異**: 現代化支援 `cluster_by` 進行 Liquid Clustering。
 
 ---
 
-## Decision Matrix
+## 決策矩陣
 
-### Use Modern API (`dp`) When:
-- ✅ **Starting new project** (default choice)
-- ✅ **Learning SDP/LDP** (learn current standard)
-- ✅ **Want Liquid Clustering**
-- ✅ **Prefer explicit Unity Catalog paths**
-- ✅ **Following 2025 best practices**
+### 使用現代化 API (`dp`) 當：
+- ✅ **開始新專案** (預設選擇)
+- ✅ **學習 SDP/LDP** (學習目前標準)
+- ✅ **想要 Liquid Clustering**
+- ✅ **偏好明確 Unity Catalog 路徑**
+- ✅ **遵循 2025 最佳實踐**
 
-### Use Legacy API (`dlt`) When:
-- ⚠️ **Maintaining existing DLT pipelines** (don't rewrite working code)
-- ⚠️ **Team trained on DLT** (consistency with existing)
-- ⚠️ **Older DBR versions** (if modern API not available)
+### 使用舊版 API (`dlt`) 當：
+- ⚠️ **維護現有 DLT 管線** (不要重寫正常運作的程式碼)
+- ⚠️ **團隊受過 DLT 訓練** (與現有一致)
+- ⚠️ **較舊的 DBR 版本** (若無法使用現代化 API)
 
-**Default**: Use modern `dp` API unless specific reason for legacy.
+**預設**: 除非有使用舊版的特定理由，否則使用現代化 `dp` API。
 
 ---
 
-## Migration Guide: dlt → dp
+## 遷移指南: dlt → dp
 
-### Step 1: Update Imports
+### 步驟 1: 更新匯入
 
-**Before**:
+**原本**:
 ```python
 import dlt
 ```
 
-**After**:
+**之後**:
 ```python
 from pyspark import pipelines as dp
 ```
 
-### Step 2: Update Decorators
+### 步驟 2: 更新裝飾器
 
-**Before**: `@dlt.table(name="my_table")`
-**After**: `@dp.table(name="my_table")`
+**原本**: `@dlt.table(name="my_table")`
+**之後**: `@dp.table(name="my_table")`
 
-### Step 3: Update Reads
+### 步驟 3: 更新讀取
 
-**Before**:
+**原本**:
 ```python
 dlt.read("source_table")
 dlt.read_stream("source_table")
 ```
 
-**After**:
+**之後**:
 ```python
 spark.table("catalog.schema.source_table")
-# Streaming context-aware, no separate read_stream
+# 串流具備 Context 感知，無獨立 read_stream
 ```
 
-### Step 4: Update CDC/SCD Operations
+### 步驟 4: 更新 CDC/SCD 操作
 
-**Before**:
+**原本**:
 ```python
 dlt.apply_changes(target="dim_customer", source="cdc_source", ...)
 ```
 
-**After**:
+**之後**:
 ```python
 from pyspark.sql.functions import col
 
@@ -271,41 +271,41 @@ dp.create_auto_cdc_flow(
 )
 ```
 
-**Key Change**: `dlt.apply_changes()` → `dp.create_auto_cdc_flow()`
+**關鍵變更**: `dlt.apply_changes()` → `dp.create_auto_cdc_flow()`
 
-### Step 5: Update Clustering
+### 步驟 5: 更新 Clustering
 
-**Before**: `@dlt.table(partition_cols=["date"])`
-**After**: `@dp.table(cluster_by=["date", "other_col"])`
+**原本**: `@dlt.table(partition_cols=["date"])`
+**之後**: `@dp.table(cluster_by=["date", "other_col"])`
 
 ---
 
-## Key Patterns (2025)
+## 關鍵模式 (2025)
 
-### 1. Use Liquid Clustering
+### 1. 使用 Liquid Clustering
 
 ```python
 @dp.table(cluster_by=["key_col", "date_col"])
 def my_table():
     return ...
 
-# Or automatic
+# 或自動
 @dp.table(cluster_by=["AUTO"])
 def my_table():
     return ...
 ```
 
-### 2. Explicit UC Paths
+### 2. 明確 UC 路徑
 
 ```python
-# ✅ Modern: explicit path
+# ✅ 現代化: 明確路徑
 spark.table("catalog.schema.table")
 
-# ❌ Legacy: implicit LIVE
+# ❌ 舊版: 隱含 LIVE
 dlt.read("table")
 ```
 
-### 3. forEachBatch for Custom Sinks
+### 3. 用於自訂 Sinks 的 forEachBatch
 
 ```python
 def write_to_custom_sink(batch_df, batch_id):
@@ -324,15 +324,15 @@ def my_table():
 
 ---
 
-## Summary
+## 總結
 
-**For New Projects**: Use modern `pyspark.pipelines` (`dp`)
-- ✅ Current best practice (2025)
-- ✅ Liquid Clustering support
-- ✅ Explicit Unity Catalog paths
+**對於新專案**: 使用現代化 `pyspark.pipelines` (`dp`)
+- ✅ 目前最佳實踐 (2025)
+- ✅ 支援 Liquid Clustering
+- ✅ 明確 Unity Catalog 路徑
 
-**For Existing Projects**: Legacy `dlt` fully supported
-- ⚠️ Migrate when convenient, not urgent
-- ⚠️ Consider modern API for new files
+**對於現有專案**: 舊版 `dlt` 受完整支援
+- ⚠️ 方便時遷移，不緊急
+- ⚠️ 對新檔案考慮使用現代化 API
 
-**Key Takeaway**: Modern API provides same functionality plus new features. Start all new projects with `from pyspark import pipelines as dp`.
+**重點**: 現代化 API 提供相同功能外加新特性。所有新專案請以 `from pyspark import pipelines as dp` 開始。

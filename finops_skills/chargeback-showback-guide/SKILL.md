@@ -51,11 +51,13 @@ SELECT
   cost_category,
   COUNT(DISTINCT ResourceGroup) AS resource_groups,
   COUNT(DISTINCT ResourceName) AS resources,
-  ROUND(SUM(CostInBillingCurrency), 2) AS total_cost,
-  ROUND(SUM(CASE WHEN is_reservation THEN CostInBillingCurrency ELSE 0 END), 2) AS reserved_cost,
-  ROUND(SUM(CASE WHEN is_reservation THEN 0 ELSE CostInBillingCurrency END), 2) AS on_demand_cost,
-  ROUND(SUM(CostInBillingCurrency) / SUM(SUM(CostInBillingCurrency)) OVER (PARTITION BY year_month) * 100, 2) AS cost_share_pct
-FROM develop_catalog.system_report.infra_azure_cost_silver
+  ROUND(SUM(total_cost), 2) AS total_cost,
+  ROUND(SUM(reservation_cost), 2) AS reserved_cost,
+  ROUND(SUM(spot_cost), 2) AS spot_cost,
+  ROUND(SUM(savingplan_cost), 2) AS saving_plan_cost,
+  ROUND(SUM(on_demand_cost), 2) AS on_demand_cost,
+  ROUND(SUM(total_cost) / SUM(SUM(total_cost)) OVER (PARTITION BY year_month) * 100, 2) AS cost_share_pct
+FROM develop_catalog.system_report.finops_daily_cost_summary
 WHERE year_month >= DATE_FORMAT(DATE_SUB(CURRENT_DATE(), 180), 'yyyy-MM')
 GROUP BY billing_month, cost_center, environment, cost_category
 ORDER BY billing_month DESC, total_cost DESC
@@ -111,22 +113,22 @@ ORDER BY month DESC, monthly_cost DESC
 -- 依資源群組的比例成本分配
 WITH rg_usage AS (
   SELECT 
-    DATE_FORMAT(Date, 'yyyy-MM') AS month,
+    year_month AS month,
     ResourceGroup,
     tag_cost_center,
     SUM(Quantity) AS total_usage,
     SUM(CostInBillingCurrency) AS direct_cost
   FROM develop_catalog.system_report.infra_azure_cost_silver
-  WHERE Date >= DATE_SUB(CURRENT_DATE(), 90)
+  WHERE year_month >= DATE_FORMAT(DATE_SUB(CURRENT_DATE(), 90), 'yyyy-MM')
     AND cost_category = 'Compute'
   GROUP BY month, ResourceGroup, tag_cost_center
 ),
 shared_costs AS (
   SELECT 
-    DATE_FORMAT(Date, 'yyyy-MM') AS month,
+    year_month AS month,
     SUM(CostInBillingCurrency) AS shared_cost
   FROM develop_catalog.system_report.infra_azure_cost_silver
-  WHERE Date >= DATE_SUB(CURRENT_DATE(), 90)
+  WHERE year_month >= DATE_FORMAT(DATE_SUB(CURRENT_DATE(), 90), 'yyyy-MM')
     AND (tag_cost_center IS NULL OR tag_cost_center = 'Shared')
   GROUP BY month
 )
@@ -155,24 +157,24 @@ ORDER BY rg.month DESC, total_allocated_cost DESC
 WITH tier1_direct AS (
   -- 第 1 層：直接標記的成本
   SELECT 
-    DATE_FORMAT(Date, 'yyyy-MM') AS month,
+    year_month AS month,
     tag_cost_center AS cost_center,
     'Direct' AS allocation_method,
     SUM(CostInBillingCurrency) AS allocated_cost
   FROM develop_catalog.system_report.infra_azure_cost_silver
-  WHERE Date >= DATE_SUB(CURRENT_DATE(), 90)
+  WHERE year_month >= DATE_FORMAT(DATE_SUB(CURRENT_DATE(), 90), 'yyyy-MM')
     AND tag_cost_center IS NOT NULL
   GROUP BY month, cost_center
 ),
 tier2_rg_based AS (
   -- 第 2 層：基於資源群組的分配
   SELECT 
-    DATE_FORMAT(Date, 'yyyy-MM') AS month,
+    year_month AS month,
     SUBSTRING_INDEX(ResourceGroup, '-', 1) AS cost_center,
     'ResourceGroup' AS allocation_method,
     SUM(CostInBillingCurrency) AS allocated_cost
   FROM develop_catalog.system_report.infra_azure_cost_silver
-  WHERE Date >= DATE_SUB(CURRENT_DATE(), 90)
+  WHERE year_month >= DATE_FORMAT(DATE_SUB(CURRENT_DATE(), 90), 'yyyy-MM')
     AND tag_cost_center IS NULL
     AND ResourceGroup IS NOT NULL
   GROUP BY month, cost_center
@@ -186,7 +188,7 @@ tier3_proportional AS (
     t1.allocated_cost / SUM(t1.allocated_cost) OVER (PARTITION BY t1.month) * 
       (SELECT SUM(CostInBillingCurrency) 
        FROM develop_catalog.system_report.infra_azure_cost_silver 
-       WHERE DATE_FORMAT(Date, 'yyyy-MM') = t1.month 
+       WHERE year_month = t1.month 
          AND tag_cost_center IS NULL 
          AND ResourceGroup IS NULL) AS allocated_cost
   FROM tier1_direct t1
@@ -218,22 +220,22 @@ ORDER BY month DESC, allocated_cost DESC
 -- 共享服務成本分配
 WITH shared_services AS (
   SELECT 
-    DATE_FORMAT(Date, 'yyyy-MM') AS month,
+    year_month AS month,
     ConsumedService,
     SUM(CostInBillingCurrency) AS shared_cost
   FROM develop_catalog.system_report.infra_azure_cost_silver
-  WHERE Date >= DATE_SUB(CURRENT_DATE(), 90)
+  WHERE year_month >= DATE_FORMAT(DATE_SUB(CURRENT_DATE(), 90), 'yyyy-MM')
     AND (ResourceGroup LIKE '%shared%' OR tag_cost_center = 'Infrastructure')
   GROUP BY month, ConsumedService
 ),
 consumer_usage AS (
   SELECT 
-    DATE_FORMAT(Date, 'yyyy-MM') AS month,
+    year_month AS month,
     tag_cost_center AS cost_center,
     SUM(Quantity) AS usage_quantity,
     SUM(CostInBillingCurrency) AS direct_cost
   FROM develop_catalog.system_report.infra_azure_cost_silver
-  WHERE Date >= DATE_SUB(CURRENT_DATE(), 90)
+  WHERE year_month >= DATE_FORMAT(DATE_SUB(CURRENT_DATE(), 90), 'yyyy-MM')
     AND tag_cost_center IS NOT NULL
     AND tag_cost_center != 'Infrastructure'
   GROUP BY month, cost_center
@@ -260,18 +262,18 @@ ORDER BY cu.month DESC, total_cost DESC
 ```sql
 -- 成本中心月度對帳單
 SELECT 
-  DATE_FORMAT(Date, 'yyyy-MM') AS billing_period,
+  year_month AS billing_period,
   tag_cost_center AS cost_center,
   cost_category,
   COUNT(DISTINCT ResourceGroup) AS resource_groups,
   COUNT(DISTINCT ResourceName) AS resources,
   ROUND(SUM(CostInBillingCurrency), 2) AS current_month_cost,
-  ROUND(LAG(SUM(CostInBillingCurrency)) OVER (PARTITION BY tag_cost_center, cost_category ORDER BY DATE_FORMAT(Date, 'yyyy-MM')), 2) AS previous_month_cost,
-  ROUND(SUM(CostInBillingCurrency) - LAG(SUM(CostInBillingCurrency)) OVER (PARTITION BY tag_cost_center, cost_category ORDER BY DATE_FORMAT(Date, 'yyyy-MM')), 2) AS mom_change,
-  ROUND((SUM(CostInBillingCurrency) - LAG(SUM(CostInBillingCurrency)) OVER (PARTITION BY tag_cost_center, cost_category ORDER BY DATE_FORMAT(Date, 'yyyy-MM'))) / 
-        NULLIF(LAG(SUM(CostInBillingCurrency)) OVER (PARTITION BY tag_cost_center, cost_category ORDER BY DATE_FORMAT(Date, 'yyyy-MM')), 0) * 100, 2) AS mom_change_pct
+  ROUND(LAG(SUM(CostInBillingCurrency)) OVER (PARTITION BY tag_cost_center, cost_category ORDER BY year_month), 2) AS previous_month_cost,
+  ROUND(SUM(CostInBillingCurrency) - LAG(SUM(CostInBillingCurrency)) OVER (PARTITION BY tag_cost_center, cost_category ORDER BY year_month), 2) AS mom_change,
+  ROUND((SUM(CostInBillingCurrency) - LAG(SUM(CostInBillingCurrency)) OVER (PARTITION BY tag_cost_center, cost_category ORDER BY year_month)) / 
+        NULLIF(LAG(SUM(CostInBillingCurrency)) OVER (PARTITION BY tag_cost_center, cost_category ORDER BY year_month), 0) * 100, 2) AS mom_change_pct
 FROM develop_catalog.system_report.infra_azure_cost_silver
-WHERE Date >= DATE_SUB(CURRENT_DATE(), 180)
+WHERE year_month >= DATE_FORMAT(DATE_SUB(CURRENT_DATE(), 180), 'yyyy-MM')
   AND tag_cost_center IS NOT NULL
 GROUP BY billing_period, tag_cost_center, cost_category
 ORDER BY billing_period DESC, current_month_cost DESC
@@ -284,20 +286,20 @@ ORDER BY billing_period DESC, current_month_cost DESC
 ```sql
 -- 未分配成本分析
 SELECT 
-  DATE_FORMAT(Date, 'yyyy-MM') AS month,
+  year_month AS month,
   ResourceGroup,
   ConsumedService,
   cost_category,
   COUNT(DISTINCT ResourceName) AS untagged_resources,
   ROUND(SUM(CostInBillingCurrency), 2) AS unallocated_cost,
-  ROUND(SUM(CostInBillingCurrency) / SUM(SUM(CostInBillingCurrency)) OVER (PARTITION BY DATE_FORMAT(Date, 'yyyy-MM')) * 100, 2) AS pct_of_total,
+  ROUND(SUM(CostInBillingCurrency) / SUM(SUM(CostInBillingCurrency)) OVER (PARTITION BY year_month) * 100, 2) AS pct_of_total,
   CASE 
     WHEN tag_cost_center IS NULL AND tag_project IS NULL THEN '完全未標記'
     WHEN tag_cost_center IS NULL THEN '缺少成本中心'
     ELSE '其他'
   END AS issue_type
 FROM develop_catalog.system_report.infra_azure_cost_silver
-WHERE Date >= DATE_SUB(CURRENT_DATE(), 90)
+WHERE year_month >= DATE_FORMAT(DATE_SUB(CURRENT_DATE(), 90), 'yyyy-MM')
   AND tag_cost_center IS NULL
 GROUP BY month, ResourceGroup, ConsumedService, cost_category, issue_type
 HAVING SUM(CostInBillingCurrency) > 50

@@ -1,20 +1,20 @@
 ---
 name: multi-sink-writes
-description: Write a single Spark stream to multiple Delta tables or Kafka topics using ForEachBatch. Use when fanning out streaming data to multiple sinks, implementing medallion architecture (bronze/silver/gold), conditional routing, CDC patterns, or creating materialized views from a single stream.
+description: 使用 ForEachBatch 將單一 Spark 串流寫入至多個 Delta 資料表或 Kafka 主題。適用於將串流資料扇出 (Fan-out) 至多個目標、實作獎章架構 (Bronze/Silver/Gold)、條件式路由、CDC 模式，或從單一串流建立物化視圖。
 ---
 
-# Multi-Sink Writes
+# 多重目標寫入 (Multi-Sink Writes)
 
-Write a single streaming source to multiple Delta tables or Kafka topics efficiently using ForEachBatch. Read once, write many - avoiding reprocessing the source multiple times.
+使用 ForEachBatch 有效率地將單一串流來源寫入至多個 Delta 資料表或 Kafka 主題。讀取一次，寫入多次 (Read once, write many) - 避免重複處理來源資料。
 
-## Quick Start
+## 快速入門 (Quick Start)
 
 ```python
 from pyspark.sql.functions import col, current_timestamp
 
 def write_multiple_tables(batch_df, batch_id):
-    """Write batch to multiple sinks"""
-    # Bronze - raw data
+    """將批次寫入至多個目標 (Sinks)"""
+    # Bronze - 原始資料
     batch_df.write \
         .format("delta") \
         .mode("append") \
@@ -22,7 +22,7 @@ def write_multiple_tables(batch_df, batch_id):
         .option("txnAppId", "multi_sink_job") \
         .save("/delta/bronze_events")
     
-    # Silver - cleansed
+    # Silver - 已清理
     cleansed = batch_df.dropDuplicates(["event_id"])
     cleansed.write \
         .format("delta") \
@@ -31,7 +31,7 @@ def write_multiple_tables(batch_df, batch_id):
         .option("txnAppId", "multi_sink_job_silver") \
         .save("/delta/silver_events")
     
-    # Gold - aggregated
+    # Gold - 已聚合
     aggregated = batch_df.groupBy("category").count()
     aggregated.write \
         .format("delta") \
@@ -46,43 +46,43 @@ stream.writeStream \
     .start()
 ```
 
-## Core Concepts
+## 核心概念 (Core Concepts)
 
-### One Source, One Checkpoint
+### 單一來源，單一檢查點
 
-Use a single checkpoint for the entire multi-sink stream:
+整個多重目標串流使用單一檢查點：
 
 ```python
-# CORRECT: One checkpoint for all sinks
+# 正確: 所有目標共用一個檢查點
 stream.writeStream \
     .foreachBatch(multi_sink_function) \
     .option("checkpointLocation", "/checkpoints/single_source_multi_sink") \
     .start()
 
-# WRONG: Don't create separate streams
-# Each stream would reprocess the source independently
+# 錯誤: 不要建立個別的串流
+#這會導致每個串流獨立重複處理來源
 ```
 
-### Transactional Guarantees
+### 交易保證 (Transactional Guarantees)
 
-Each ForEachBatch call represents one epoch. All writes within the batch:
-- See the same input data
-- Share the same batch_id
-- Are idempotent if using txnVersion
+每次 ForEachBatch 呼叫代表一個 Epoch。批次內的所有寫入：
+- 看到相同的輸入資料
+- 共用相同的 batch_id
+- 若使用 txnVersion 則具備冪等性 (Idempotent)
 
-## Common Patterns
+## 常見模式 (Common Patterns)
 
-### Pattern 1: Bronze-Silver-Gold Medallion Architecture
+### 模式 1: Bronze-Silver-Gold 獎章架構
 
-Single stream feeding all three medallion layers:
+單一串流供應所有三個獎章層級：
 
 ```python
 from pyspark.sql.functions import window, count, sum, current_timestamp
 
 def medallion_architecture(batch_df, batch_id):
-    """Single stream feeding all three medallion layers"""
+    """單一串流供應所有三個獎章層級"""
     
-    # Bronze: Raw ingestion
+    # Bronze: 原始攝取
     (batch_df.write
         .format("delta")
         .mode("append")
@@ -91,7 +91,7 @@ def medallion_architecture(batch_df, batch_id):
         .saveAsTable("bronze.events")
     )
     
-    # Silver: Cleansed and validated
+    # Silver: 清理與驗證
     silver_df = (batch_df
         .dropDuplicates(["event_id"])
         .filter(col("status").isin(["active", "pending"]))
@@ -106,7 +106,7 @@ def medallion_architecture(batch_df, batch_id):
         .saveAsTable("silver.events")
     )
     
-    # Gold: Business aggregates
+    # Gold: 業務聚合
     gold_df = (silver_df
         .groupBy(window(col("timestamp"), "5 minutes"), "category")
         .agg(
@@ -130,20 +130,20 @@ stream.writeStream \
     .start()
 ```
 
-### Pattern 2: Conditional Routing
+### 模式 2: 條件式路由 (Conditional Routing)
 
-Route events to different tables based on criteria:
+根據條件將事件路由至不同資料表：
 
 ```python
 def route_by_type(batch_df, batch_id):
-    """Route events to different tables based on type"""
+    """根據類型將事件路由至不同資料表"""
     
-    # Split by event type
+    # 依事件類型拆分
     orders = batch_df.filter(col("event_type") == "order")
     refunds = batch_df.filter(col("event_type") == "refund")
     reviews = batch_df.filter(col("event_type") == "review")
     
-    # Write to respective tables
+    # 寫入至個別資料表
     if orders.count() > 0:
         (orders.write
             .format("delta")
@@ -172,21 +172,21 @@ def route_by_type(batch_df, batch_id):
         )
 ```
 
-### Pattern 3: Parallel Fan-Out
+### 模式 3: 平行扇出 (Parallel Fan-Out)
 
-Write to multiple sinks in parallel for independent tables:
+平行寫入至多個獨立資料表：
 
 ```python
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 def parallel_write(batch_df, batch_id):
-    """Write to multiple sinks in parallel"""
+    """平行寫入至多個目標"""
     
-    # Cache to avoid recomputation
+    # Cache 以避免重複計算
     batch_df.cache()
     
     def write_table(table_name, filter_expr=None):
-        """Write filtered data to table"""
+        """寫入過濾後的資料至資料表"""
         df = batch_df.filter(filter_expr) if filter_expr else batch_df
         (df.write
             .format("delta")
@@ -197,7 +197,7 @@ def parallel_write(batch_df, batch_id):
         )
         return f"Wrote {table_name}"
     
-    # Define tables and filters
+    # 定義資料表與過濾器
     tables = [
         ("bronze.all_events", None),
         ("silver.errors", col("level") == "ERROR"),
@@ -205,7 +205,7 @@ def parallel_write(batch_df, batch_id):
         ("gold.metrics", col("type") == "metric")
     ]
     
-    # Parallel writes
+    # 平行寫入
     with ThreadPoolExecutor(max_workers=4) as executor:
         futures = {
             executor.submit(write_table, table_name, filter_expr): table_name 
@@ -226,17 +226,17 @@ def parallel_write(batch_df, batch_id):
         raise Exception(f"Write failures: {errors}")
 ```
 
-### Pattern 4: Materialized Views
+### 模式 4: 物化視圖 (Materialized Views)
 
-Create multiple derived views from the same stream:
+從同一串流建立多個衍生視圖：
 
 ```python
 from pyspark.sql.functions import window, count, sum
 
 def create_materialized_views(batch_df, batch_id):
-    """Create multiple derived views from the same stream"""
+    """從同一串流建立多個衍生視圖"""
     
-    # Base: All events
+    # 基底: 所有事件
     (batch_df.write
         .format("delta")
         .mode("append")
@@ -245,7 +245,7 @@ def create_materialized_views(batch_df, batch_id):
         .save("/delta/views/raw")
     )
     
-    # View 1: Hourly aggregations
+    # 視圖 1: 每小時聚合
     hourly = (batch_df
         .withWatermark("event_time", "1 hour")
         .groupBy(window(col("event_time"), "1 hour"), col("category"))
@@ -263,7 +263,7 @@ def create_materialized_views(batch_df, batch_id):
         .save("/delta/views/hourly")
     )
     
-    # View 2: User sessions (15 min window)
+    # 視圖 2: 使用者工作階段 (15 分鐘視窗)
     sessions = (batch_df
         .withWatermark("event_time", "15 minutes")
         .groupBy(window(col("event_time"), "15 minutes"), col("user_id"))
@@ -279,17 +279,17 @@ def create_materialized_views(batch_df, batch_id):
     )
 ```
 
-### Pattern 5: Error Handling with Dead Letter Queue
+### 模式 5: 搭配死信佇列的錯誤處理
 
-Route invalid records to DLQ:
+將無效記錄路由至 DLQ：
 
 ```python
 from pyspark.sql.functions import when, lit
 
 def write_with_dlq(batch_df, batch_id):
-    """Write valid records to target, invalid to dead letter queue"""
+    """寫入有效記錄至目標，無效記錄至死信佇列"""
     
-    # Validation
+    # 驗證
     valid = batch_df.filter(
         col("required_field").isNotNull() & 
         col("timestamp").isNotNull()
@@ -299,7 +299,7 @@ def write_with_dlq(batch_df, batch_id):
         col("timestamp").isNull()
     )
     
-    # Write valid data
+    # 寫入有效資料
     if valid.count() > 0:
         (valid.write
             .format("delta")
@@ -309,7 +309,7 @@ def write_with_dlq(batch_df, batch_id):
             .saveAsTable("silver.valid_events")
         )
     
-    # Write invalid to DLQ with metadata
+    # 寫入無效資料至 DLQ 並附帶中繼資料
     if invalid.count() > 0:
         dlq_df = (invalid
             .withColumn("_error_reason", 
@@ -326,44 +326,44 @@ def write_with_dlq(batch_df, batch_id):
         )
 ```
 
-## Performance Optimization
+## 效能優化 (Performance Optimization)
 
-### Minimize Recomputation
+### 最小化重複計算
 
-Cache the batch DataFrame to avoid recomputation:
+快取批次 DataFrame 以避免重複計算：
 
 ```python
 def optimized_multi_sink(batch_df, batch_id):
-    """Cache to avoid recomputation"""
+    """快取以避免重複計算"""
     
-    # Cache the batch
+    # 快取批次
     batch_df.cache()
     
-    # Multiple writes from cached data
+    # 從快取資料進行多次寫入
     batch_df.write...  # Sink 1
     batch_df.filter(...).write...  # Sink 2
     batch_df.filter(...).write...  # Sink 3
     
-    # Unpersist when done
+    # 完成後 Unpersist
     batch_df.unpersist()
 ```
 
-### Parallel Writes
+### 平行寫入
 
-Use ThreadPoolExecutor for independent writes:
+使用 ThreadPoolExecutor 進行獨立寫入：
 
 ```python
 from concurrent.futures import ThreadPoolExecutor
 
 def parallel_write(batch_df, batch_id):
-    """Write to independent tables in parallel"""
+    """平行寫入至獨立資料表"""
     
     batch_df.cache()
     
     def write_table(table_name, df):
         df.write.format("delta").mode("append").saveAsTable(table_name)
     
-    # Parallel writes
+    # 平行寫入
     with ThreadPoolExecutor(max_workers=4) as executor:
         executor.submit(write_table, "table1", batch_df)
         executor.submit(write_table, "table2", batch_df.filter(...))
@@ -372,21 +372,21 @@ def parallel_write(batch_df, batch_id):
     batch_df.unpersist()
 ```
 
-## Common Issues
+## 常見問題 (Common Issues)
 
-| Issue | Cause | Solution |
+| 問題 | 原因 | 解決方案 |
 |-------|-------|----------|
-| **Slow writes** | Sequential processing | Use parallel ThreadPoolExecutor |
-| **Recomputation** | Multiple actions on same DataFrame | Cache the batch DataFrame |
-| **Partial failures** | One sink fails | Use idempotent writes; Spark retries entire batch |
-| **Schema conflicts** | Tables have different schemas | Transform before each write |
-| **Resource contention** | Too many concurrent writes | Limit parallelism; batch writes |
+| **寫入緩慢** | 循序處理 | 使用 ThreadPoolExecutor 平行處理 |
+| **重複計算** | 對同一 DataFrame 執行多次 Action | 快取批次 DataFrame |
+| **部分失敗** | 單一目標失敗 | 使用冪等寫入; Spark 會重試整個批次 |
+| **Schema 衝突** | 資料表有不同 Schema | 寫入前進行轉換 |
+| **資源競爭** | 並發寫入過多 | 限制平行度; 分批寫入 |
 
-## Production Best Practices
+## 生產最佳實踐 (Production Best Practices)
 
-### Idempotent Writes
+### 冪等寫入 (Idempotent Writes)
 
-Always use txnVersion with batch_id:
+始終搭配 batch_id 使用 txnVersion：
 
 ```python
 .write
@@ -396,32 +396,32 @@ Always use txnVersion with batch_id:
     .mode("append")
 ```
 
-### Keep Batch Processing Fast
+### 保持批次處理快速
 
 ```python
-# GOOD: Simple filters and writes
+# GOOD: 簡單的過濾與寫入
 def efficient_write(df, batch_id):
     df.filter(...).write.save("/delta/table1")
     df.filter(...).write.save("/delta/table2")
 
-# BAD: Expensive aggregations (move to stream definition)
+# BAD: 昂貴的聚合 (移至串流定義中!)
 def inefficient_write(df, batch_id):
-    df.groupBy(...).agg(...).write.save("/delta/table3")  # Move to stream!
+    df.groupBy(...).agg(...).write.save("/delta/table3")  # 移至串流!
 ```
 
-## Production Checklist
+## 生產檢核清單 (Production Checklist)
 
-- [ ] One checkpoint per multi-sink stream
-- [ ] Idempotent writes configured (txnVersion/txnAppId)
-- [ ] Cache used to avoid recomputation
-- [ ] Parallel writes for independent tables
-- [ ] Error handling and DLQ configured
-- [ ] Schema evolution handled
-- [ ] Performance monitoring per sink
+- [ ] 每個多重目標串流使用單一檢查點
+- [ ] 設定冪等寫入 (txnVersion/txnAppId)
+- [ ] 使用 Cache 避免重複計算
+- [ ] 對獨立資料表使用平行寫入
+- [ ] 設定錯誤處理與 DLQ
+- [ ] 處理 Schema 演變
+- [ ] 每個目標的效能監控
 
-## Related Skills
+## 相關技能 (Related Skills)
 
-- `merge-operations` - Parallel MERGE operations
-- `kafka-streaming` - Kafka ingestion patterns
-- `stream-static-joins` - Enrichment before multi-sink writes
-- `checkpoint-best-practices` - Checkpoint configuration
+- `merge-operations` - 平行 MERGE 操作
+- `kafka-streaming` - Kafka 攝取模式
+- `stream-static-joins` - 多重目標寫入前的豐富化
+- `checkpoint-best-practices` - 檢查點設定

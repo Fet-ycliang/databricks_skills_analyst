@@ -1,165 +1,165 @@
-# Advanced Pipeline Configuration (`extra_settings`)
+# 進階管線設定 (`extra_settings`)
 
-By default, pipelines are created with **serverless compute and Unity Catalog**. Use the `extra_settings` parameter only for advanced use cases.
+預設情況下，管線會使用 **Serverless Compute 與 Unity Catalog** 建立。僅在進階使用案例時使用 `extra_settings` 參數。
 
-**CRITICAL: Do NOT use `extra_settings` to set `serverless=false` unless the user explicitly requires:**
-- R language support
+**重要：除非使用者明確要求，否則請勿使用 `extra_settings` 將 `serverless` 設為 `false`：**
+- R 語言支援
 - Spark RDD APIs
-- JAR libraries or Maven coordinates
+- JAR 函式庫或 Maven 座標
 
-## When to Use `extra_settings`
+## 何時使用 `extra_settings`
 
-- **Development mode**: Faster iteration with relaxed validation
-- **Continuous pipelines**: Real-time streaming instead of triggered runs
-- **Event logging**: Custom event log table location
-- **Pipeline metadata**: Tags, configuration variables
-- **Python dependencies**: Install pip packages for serverless pipelines
-- **Classic clusters** (rare): Only if user explicitly needs R, RDD APIs, or JARs
+- **開發模式**: 透過寬鬆的驗證加速迭代
+- **連續管線 (Continuous)**: 即時串流而非觸發執行
+- **事件日誌**: 自訂事件日誌資料表位置
+- **管線 Metadata**: Tags, 設定變數
+- **Python 依賴**: 為 Serverless 管線安裝 pip 套件
+- **Classic Clusters** (罕見): 僅當使用者明確需要 R, RDD APIs 或 JARs 時
 
-## `extra_settings` Parameter Reference
+## `extra_settings` 參數參考
 
-### Top-Level Fields
+### 頂層欄位
 
-| Field | Type | Default | Description |
+| 欄位 | 類型 | 預設值 | 描述 |
 |-------|------|---------|-------------|
-| `serverless` | bool | `true` | Use serverless compute. Set `false` for dedicated clusters. |
-| `continuous` | bool | `false` | `true` = always running (real-time), `false` = triggered runs |
-| `development` | bool | `false` | Development mode: faster startup, relaxed validation, no retries |
-| `photon` | bool | `false` | Enable Photon vectorized query engine |
-| `edition` | str | `"CORE"` | `"CORE"`, `"PRO"`, or `"ADVANCED"`. Advanced required for CDC. |
-| `channel` | str | `"CURRENT"` | `"CURRENT"` (stable) or `"PREVIEW"` (latest features) |
-| `clusters` | list | `[]` | Cluster configs (required if `serverless=false`) |
-| `configuration` | dict | `{}` | Spark config key-value pairs (all values must be strings) |
-| `tags` | dict | `{}` | Pipeline metadata tags (max 25 tags) |
-| `event_log` | dict | auto | Custom event log table location |
-| `notifications` | list | `[]` | Email/webhook alerts on pipeline events |
-| `id` | str | - | Force update of specific pipeline ID |
-| `allow_duplicate_names` | bool | `false` | Allow multiple pipelines with same name |
-| `budget_policy_id` | str | - | Budget policy ID for cost tracking |
-| `storage` | str | - | DBFS root directory for checkpoints/tables (legacy, use Unity Catalog instead) |
-| `target` | str | - | **Deprecated**: Use `schema` parameter instead |
-| `dry_run` | bool | `false` | Validate pipeline without creating (create only) |
-| `run_as` | dict | - | Run pipeline as specific user/service principal |
-| `restart_window` | dict | - | Maintenance window for continuous pipeline restarts |
-| `filters` | dict | - | Include/exclude specific paths from pipeline |
-| `trigger` | dict | - | **Deprecated**: Use `continuous` instead |
-| `deployment` | dict | - | Deployment method (BUNDLE or DEFAULT) |
-| `environment` | dict | - | Python pip dependencies for serverless |
-| `gateway_definition` | dict | - | CDC gateway pipeline configuration |
-| `ingestion_definition` | dict | - | Managed ingestion settings (Salesforce, Workday, etc.) |
-| `usage_policy_id` | str | - | Usage policy ID |
+| `serverless` | bool | `true` | 使用 Serverless Compute。設為 `false` 則使用專用叢集。 |
+| `continuous` | bool | `false` | `true` = 永遠執行 (即時), `false` = 觸發執行 |
+| `development` | bool | `false` | 開發模式：加速啟動，寬鬆驗證，無重試 |
+| `photon` | bool | `false` | 啟用 Photon 向量化查詢引擎 |
+| `edition` | str | `"CORE"` | `"CORE"`, `"PRO"`, 或 `"ADVANCED"`. CDC 需要 Advanced。 |
+| `channel` | str | `"CURRENT"` | `"CURRENT"` (穩定) 或 `"PREVIEW"` (最新功能) |
+| `clusters` | list | `[]` | 叢集設定 (若 `serverless=false` 則為必填) |
+| `configuration` | dict | `{}` | Spark 設定鍵值對 (所有值必須是字串) |
+| `tags` | dict | `{}` | 管線 Metadata Tags (最多 25 個) |
+| `event_log` | dict | auto | 自訂事件日誌資料表位置 |
+| `notifications` | list | `[]` | 管線事件的 Email/Webhook 警報 |
+| `id` | str | - | 強制更新特定 Pipeline ID |
+| `allow_duplicate_names` | bool | `false` | 允許相同名稱的多個管線 |
+| `budget_policy_id` | str | - | 用於成本追蹤的預算策略 ID |
+| `storage` | str | - | Checkpoints/Tables 的 DBFS 根目錄 (舊版，請改用 Unity Catalog) |
+| `target` | str | - | **已棄用**: 請改用 `schema` 參數 |
+| `dry_run` | bool | `false` | 驗證管線而不建立 (僅建立) |
+| `run_as` | dict | - | 以特定使用者/Service Principal 身份執行管線 |
+| `restart_window` | dict | - | 連續管線重啟的維護視窗 |
+| `filters` | dict | - | 包含/排除管線中的特定路徑 |
+| `trigger` | dict | - | **已棄用**: 請改用 `continuous` |
+| `deployment` | dict | - | 部署方法 (BUNDLE 或 DEFAULT) |
+| `environment` | dict | - | Serverless 的 Python pip 依賴 |
+| `gateway_definition` | dict | - | CDC Gateway 管線設定 |
+| `ingestion_definition` | dict | - | 託管攝取設定 (Salesforce, Workday 等) |
+| `usage_policy_id` | str | - | 使用策略 ID |
 
-### `clusters` Array - Cluster Configuration
+### `clusters` 陣列 - 叢集設定
 
-Each cluster object supports these fields:
+每個叢集物件支援這些欄位：
 
-| Field | Type | Description |
+| 欄位 | 類型 | 描述 |
 |-------|------|-------------|
-| `label` | str | **Required**. `"default"` for main cluster, `"maintenance"` for maintenance tasks |
-| `num_workers` | int | Fixed number of workers (use this OR autoscale, not both) |
+| `label` | str | **必填**。主要叢集為 `"default"`，維護任務為 `"maintenance"` |
+| `num_workers` | int | 固定 Worker 數量 (使用此項或 autoscale，不可兩者皆用) |
 | `autoscale` | dict | `{"min_workers": 1, "max_workers": 4, "mode": "ENHANCED"}` |
-| `node_type_id` | str | Instance type, e.g., `"i3.xlarge"`, `"Standard_DS3_v2"` |
-| `driver_node_type_id` | str | Driver instance type (defaults to node_type_id) |
-| `instance_pool_id` | str | Use instances from this pool (faster startup) |
-| `driver_instance_pool_id` | str | Pool for driver node |
-| `spark_conf` | dict | Spark configuration for this cluster |
-| `spark_env_vars` | dict | Environment variables |
-| `custom_tags` | dict | Tags applied to cloud resources |
-| `init_scripts` | list | Init script locations |
-| `aws_attributes` | dict | AWS-specific: `{"availability": "SPOT", "zone_id": "us-west-2a"}` |
-| `azure_attributes` | dict | Azure-specific: `{"availability": "SPOT_AZURE"}` |
-| `gcp_attributes` | dict | GCP-specific settings |
+| `node_type_id` | str | 實例類型，例如 `"i3.xlarge"`, `"Standard_DS3_v2"` |
+| `driver_node_type_id` | str | Driver 實例類型 (預設為 node_type_id) |
+| `instance_pool_id` | str | 使用此 Pool 的實例 (加速啟動) |
+| `driver_instance_pool_id` | str | Driver 節點的 Pool |
+| `spark_conf` | dict | 此叢集的 Spark 設定 |
+| `spark_env_vars` | dict | 環境變數 |
+| `custom_tags` | dict | 應用於雲端資源的 Tags |
+| `init_scripts` | list | Init Script 位置 |
+| `aws_attributes` | dict | AWS 專屬: `{"availability": "SPOT", "zone_id": "us-west-2a"}` |
+| `azure_attributes` | dict | Azure 專屬: `{"availability": "SPOT_AZURE"}` |
+| `gcp_attributes` | dict | GCP 專屬設定 |
 
-**Autoscale modes**: `"LEGACY"` or `"ENHANCED"` (recommended, optimizes for DLT workloads)
+**Autoscale 模式**: `"LEGACY"` 或 `"ENHANCED"` (推薦，針對 DLT 工作負載優化)
 
-### `event_log` Object - Custom Event Log Location
+### `event_log` 物件 - 自訂事件日誌位置
 
-| Field | Type | Description |
+| 欄位 | 類型 | 描述 |
 |-------|------|-------------|
-| `catalog` | str | Unity Catalog name for event log table |
-| `schema` | str | Schema name for event log table |
-| `name` | str | Table name for event logs |
+| `catalog` | str | 事件日誌資料表的 Unity Catalog 名稱 |
+| `schema` | str | 事件日誌資料表的 Schema 名稱 |
+| `name` | str | 事件日誌的資料表名稱 |
 
-### `notifications` Array - Alert Configuration
+### `notifications` 陣列 - 警報設定
 
-Each notification object:
+每個通知物件：
 
-| Field | Type | Description |
+| 欄位 | 類型 | 描述 |
 |-------|------|-------------|
-| `email_recipients` | list | List of email addresses |
-| `alerts` | list | Events to alert on: `"on-update-success"`, `"on-update-failure"`, `"on-update-fatal-failure"`, `"on-flow-failure"` |
+| `email_recipients` | list | Email 地址列表 |
+| `alerts` | list | 觸發警報的事件: `"on-update-success"`, `"on-update-failure"`, `"on-update-fatal-failure"`, `"on-flow-failure"` |
 
-### `configuration` Dict - Spark/Pipeline Config
+### `configuration` Dict - Spark/Pipeline 設定
 
-Common configuration keys (all values must be strings):
+常見設定鍵 (所有值必須是字串)：
 
-| Key | Description |
+| 鍵 | 描述 |
 |-----|-------------|
-| `spark.sql.shuffle.partitions` | Number of shuffle partitions (`"auto"` recommended) |
-| `pipelines.numRetries` | Number of retries on transient failures |
-| `pipelines.trigger.interval` | Trigger interval for continuous pipelines, e.g., `"1 hour"` |
-| `spark.databricks.delta.preview.enabled` | Enable Delta preview features (`"true"`) |
+| `spark.sql.shuffle.partitions` | Shuffle 分區數量 (`"auto"` 推薦) |
+| `pipelines.numRetries` | 瞬時失敗的重試次數 |
+| `pipelines.trigger.interval` | 連續管線的觸發間隔，例如 `"1 hour"` |
+| `spark.databricks.delta.preview.enabled` | 啟用 Delta 預覽功能 (`"true"`) |
 
-### `run_as` Object - Pipeline Execution Identity
+### `run_as` 物件 - 管線執行身分
 
-Specify which user or service principal runs the pipeline:
+指定執行管線的使用者或 Service Principal：
 
-| Field | Type | Description |
+| 欄位 | 類型 | 描述 |
 |-------|------|-------------|
-| `user_name` | str | Email of workspace user (can only set to your own email) |
-| `service_principal_name` | str | Application ID of service principal (requires servicePrincipal/user role) |
+| `user_name` | str | Workspace 使用者的 Email (僅能設為自己的 Email) |
+| `service_principal_name` | str | Service Principal 的 Application ID (需要 servicePrincipal/user 角色) |
 
-**Note**: Only one of `user_name` or `service_principal_name` can be set.
+**注意**: 只能設定 `user_name` 或 `service_principal_name` 其中之一。
 
-### `restart_window` Object - Continuous Pipeline Restart Schedule
+### `restart_window` 物件 - 連續管線重啟排程
 
-For continuous pipelines, define when restarts can occur:
+對於連續管線，定義何時可以發生重啟：
 
-| Field | Type | Description |
+| 欄位 | 類型 | 描述 |
 |-------|------|-------------|
-| `start_hour` | int | **Required**. Hour (0-23) when 5-hour restart window begins |
-| `days_of_week` | list | Days allowed: `"MONDAY"`, `"TUESDAY"`, etc. (default: all days) |
-| `time_zone_id` | str | Timezone, e.g., `"America/Los_Angeles"` (default: UTC) |
+| `start_hour` | int | **必填**。5 小時重啟視窗開始的小時 (0-23) |
+| `days_of_week` | list | 允許的天數: `"MONDAY"`, `"TUESDAY"` 等 (預設: 每天) |
+| `time_zone_id` | str | 時區，例如 `"America/Los_Angeles"` (預設: UTC) |
 
-### `filters` Object - Path Filtering
+### `filters` 物件 - 路徑過濾
 
-Include or exclude specific paths from the pipeline:
+包含或排除管線中的特定路徑：
 
-| Field | Type | Description |
+| 欄位 | 類型 | 描述 |
 |-------|------|-------------|
-| `include` | list | List of paths to include |
-| `exclude` | list | List of paths to exclude |
+| `include` | list | 包含的路徑列表 |
+| `exclude` | list | 排除的路徑列表 |
 
-### `environment` Object - Python Dependencies (Serverless)
+### `environment` 物件 - Python 依賴 (Serverless)
 
-Install pip dependencies for serverless pipelines:
+為 Serverless 管線安裝 pip 依賴：
 
-| Field | Type | Description |
+| 欄位 | 類型 | 描述 |
 |-------|------|-------------|
-| `dependencies` | list | List of pip requirements (e.g., `["pandas==2.0.0", "requests"]`) |
+| `dependencies` | list | pip requirements 列表 (例如 `["pandas==2.0.0", "requests"]`) |
 
-### `deployment` Object - Deployment Method
+### `deployment` 物件 - 部署方法
 
-| Field | Type | Description |
+| 欄位 | 類型 | 描述 |
 |-------|------|-------------|
-| `kind` | str | `"BUNDLE"` (Databricks Asset Bundles) or `"DEFAULT"` |
-| `metadata_file_path` | str | Path to deployment metadata file |
+| `kind` | str | `"BUNDLE"` (Databricks Asset Bundles) 或 `"DEFAULT"` |
+| `metadata_file_path` | str | 部署 Metadata 檔案的路徑 |
 
-### Edition Comparison
+### 版本比較 (Edition Comparison)
 
-| Feature | CORE | PRO | ADVANCED |
+| 功能 | CORE | PRO | ADVANCED |
 |---------|------|-----|----------|
-| Streaming tables | Yes | Yes | Yes |
-| Materialized views | Yes | Yes | Yes |
-| Expectations (data quality) | Yes | Yes | Yes |
+| 串流資料表 | Yes | Yes | Yes |
+| 物化視圖 | Yes | Yes | Yes |
+| Expectations (資料品質) | Yes | Yes | Yes |
 | Change Data Capture (CDC) | No | No | Yes |
 | SCD Type 1/2 | No | No | Yes |
 
-## Configuration Examples
+## 設定範例
 
-### Development Mode Pipeline
+### 開發模式管線
 
-Use `create_or_update_pipeline` tool with:
+使用 `create_or_update_pipeline` 工具搭配：
 - `name`: "my_dev_pipeline"
 - `root_path`: "/Workspace/Users/user@example.com/my_pipeline"
 - `catalog`: "dev_catalog"
@@ -174,9 +174,9 @@ Use `create_or_update_pipeline` tool with:
 }
 ```
 
-### Non-Serverless with Dedicated Cluster
+### 非 Serverless 搭配專用叢集
 
-Use `create_or_update_pipeline` tool with `extra_settings`:
+使用 `create_or_update_pipeline` 工具搭配 `extra_settings`:
 ```json
 {
     "serverless": false,
@@ -191,9 +191,9 @@ Use `create_or_update_pipeline` tool with `extra_settings`:
 }
 ```
 
-### Continuous Streaming Pipeline
+### 連續串流管線
 
-Use `create_or_update_pipeline` tool with `extra_settings`:
+使用 `create_or_update_pipeline` 工具搭配 `extra_settings`:
 ```json
 {
     "continuous": true,
@@ -203,9 +203,9 @@ Use `create_or_update_pipeline` tool with `extra_settings`:
 }
 ```
 
-### Using Instance Pool
+### 使用 Instance Pool
 
-Use `create_or_update_pipeline` tool with `extra_settings`:
+使用 `create_or_update_pipeline` 工具搭配 `extra_settings`:
 ```json
 {
     "serverless": false,
@@ -218,9 +218,9 @@ Use `create_or_update_pipeline` tool with `extra_settings`:
 }
 ```
 
-### Custom Event Log Location
+### 自訂事件日誌位置
 
-Use `create_or_update_pipeline` tool with `extra_settings`:
+使用 `create_or_update_pipeline` 工具搭配 `extra_settings`:
 ```json
 {
     "event_log": {
@@ -231,9 +231,9 @@ Use `create_or_update_pipeline` tool with `extra_settings`:
 }
 ```
 
-### Pipeline with Email Notifications
+### 具備 Email 通知的管線
 
-Use `create_or_update_pipeline` tool with `extra_settings`:
+使用 `create_or_update_pipeline` 工具搭配 `extra_settings`:
 ```json
 {
     "notifications": [{
@@ -243,9 +243,9 @@ Use `create_or_update_pipeline` tool with `extra_settings`:
 }
 ```
 
-### Production Pipeline with Autoscaling
+### 具備 Autoscaling 的生產管線
 
-Use `create_or_update_pipeline` tool with `extra_settings`:
+使用 `create_or_update_pipeline` 工具搭配 `extra_settings`:
 ```json
 {
     "serverless": false,
@@ -272,9 +272,9 @@ Use `create_or_update_pipeline` tool with `extra_settings`:
 }
 ```
 
-### Run as Service Principal
+### 以 Service Principal 執行
 
-Use `create_or_update_pipeline` tool with `extra_settings`:
+使用 `create_or_update_pipeline` 工具搭配 `extra_settings`:
 ```json
 {
     "run_as": {
@@ -283,9 +283,9 @@ Use `create_or_update_pipeline` tool with `extra_settings`:
 }
 ```
 
-### Continuous Pipeline with Restart Window
+### 具備重啟視窗的連續管線
 
-Use `create_or_update_pipeline` tool with `extra_settings`:
+使用 `create_or_update_pipeline` 工具搭配 `extra_settings`:
 ```json
 {
     "continuous": true,
@@ -297,9 +297,9 @@ Use `create_or_update_pipeline` tool with `extra_settings`:
 }
 ```
 
-### Serverless with Python Dependencies
+### Serverless 搭配 Python 依賴
 
-Use `create_or_update_pipeline` tool with `extra_settings`:
+使用 `create_or_update_pipeline` 工具搭配 `extra_settings`:
 ```json
 {
     "serverless": true,
@@ -313,18 +313,18 @@ Use `create_or_update_pipeline` tool with `extra_settings`:
 }
 ```
 
-### Update Existing Pipeline by ID
+### 依 ID 更新現有管線
 
-If you have a pipeline ID from the Databricks UI, you can force an update by including `id` in `extra_settings`:
+若您有來自 Databricks UI 的管線 ID，可在 `extra_settings` 中包含 `id` 強制更新：
 ```json
 {
     "id": "554f4497-4807-4182-bff0-ffac4bb4f0ce"
 }
 ```
 
-### Full JSON Export from Databricks UI
+### 從 Databricks UI 匯出完整 JSON
 
-You can copy pipeline settings from the Databricks UI (Pipeline Settings > JSON) and pass them directly as `extra_settings`. Invalid fields like `pipeline_type` are automatically filtered:
+您可以從 Databricks UI (Pipeline Settings > JSON)複製管線設定，並直接作為 `extra_settings` 傳遞。無效欄位如 `pipeline_type` 會自動過濾：
 
 ```json
 {
@@ -347,4 +347,4 @@ You can copy pipeline settings from the Databricks UI (Pipeline Settings > JSON)
 }
 ```
 
-**Note**: Explicit tool parameters (`name`, `root_path`, `catalog`, `schema`, `workspace_file_paths`) always take precedence over values in `extra_settings`.
+**注意**: 明確的工具參數 (`name`, `root_path`, `catalog`, `schema`, `workspace_file_paths`) 優先順序恆大於 `extra_settings` 中的值。

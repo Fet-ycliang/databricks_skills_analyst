@@ -1,19 +1,19 @@
 ---
 name: stream-stream-joins
-description: Join two streaming sources in real-time with event-time semantics, watermarks, and state management. Use when correlating events from different streams (orders with payments, clicks with conversions, sensor readings), handling late-arriving data, or implementing windowed aggregations across multiple streams.
+description: 使用事件時間語義、浮水印 (Watermarks) 與狀態管理，即時關聯兩個串流來源。適用於關聯來自不同串流的事件 (訂單與付款、點擊與轉換、感測器讀數)、處理遲到資料，或實作跨多串流的視窗聚合。
 ---
 
-# Stream-Stream Joins
+# 雙串流關聯 (Stream-Stream Joins)
 
-Join two streaming sources in real-time to correlate events that arrive at different times and speeds. Stream-stream joins require watermarks to manage state and handle late-arriving data.
+即時關聯兩個串流來源，以連結在不同時間與速度到達的事件。雙串流關聯需要浮水印來管理狀態並處理遲到資料。
 
-## Quick Start
+## 快速入門 (Quick Start)
 
 ```python
 from pyspark.sql.functions import expr, from_json, col
 from pyspark.sql.types import StructType
 
-# Read two streaming sources
+# 讀取兩個串流來源
 orders = (spark
     .readStream
     .format("kafka")
@@ -36,7 +36,7 @@ payments = (spark
     .withWatermark("payment_time", "10 minutes")
 )
 
-# Join with time bounds
+# 具備時間邊界的關聯
 matched = (orders
     .join(
         payments,
@@ -49,7 +49,7 @@ matched = (orders
     )
 )
 
-# Write results
+# 寫入結果
 query = (matched
     .writeStream
     .format("delta")
@@ -60,34 +60,34 @@ query = (matched
 )
 ```
 
-## Core Concepts
+## 核心概念 (Core Concepts)
 
-### Why Stream-Stream Joins Need Watermarks
+### 為何雙串流關聯需要浮水印
 
-Stream-stream joins are stateful: both sides must buffer events until matches are found or state expires. Watermarks define when state can be safely cleaned up.
+雙串流關聯是有狀態的：雙方都必須緩衝事件直到找到匹配或狀態過期。浮水印定義了何時可以安全清理狀態。
 
 ```python
 # Watermark = latest_event_time - delay_threshold
 .withWatermark("event_time", "10 minutes")
 
-# Events with timestamp < watermark are considered "too late"
-# State for late events is automatically cleaned up
+# 時間戳記 < 浮水印的事件被視為「過遲」
+# 遲到事件的狀態會被自動清理
 ```
 
-### Join Types and Behavior
+### 關聯類型與行為
 
-| Join Type | Matches | Late Events | Use Case |
+| 關聯類型 | 匹配方式 | 遲到事件 | 使用案例 |
 |-----------|---------|-------------|----------|
-| **Inner** | Both sides | May still match if other side hasn't expired | Correlation analysis |
-| **Left Outer** | All left + matched right | Dropped from left side after watermark | Enrichment with optional data |
-| **Right Outer** | All right + matched left | Dropped from right side after watermark | Rarely used |
-| **Full Outer** | All events from both | Dropped after watermark | Complete picture |
+| **Inner** | 雙方 | 若另一方尚未過期仍可能匹配 | 關聯性分析 |
+| **Left Outer** | 所有左側 + 匹配的右側 | 浮水印過後從左側丟棄 | 具備可選資料的豐富化 |
+| **Right Outer** | 所有右側 + 匹配的左側 | 浮水印過後從右側丟棄 | 很少使用 |
+| **Full Outer** | 來自雙方的所有事件 | 浮水印過後丟棄 | 完整全貌 |
 
-## Common Patterns
+## 常見模式 (Common Patterns)
 
-### Pattern 1: Order-Payment Matching
+### 模式 1: 訂單-付款匹配
 
-Match orders with payments within a time window:
+在時間視窗內匹配訂單與付款：
 
 ```python
 orders = (spark
@@ -110,7 +110,7 @@ payments = (spark
     .withWatermark("payment_time", "10 minutes")
 )
 
-# Match payments within 10 minutes of order
+# 匹配訂單前後 10 分鐘內的付款
 matched = (orders
     .join(
         payments,
@@ -119,7 +119,7 @@ matched = (orders
             payments.payment_time >= orders.order_time - interval 5 minutes AND
             payments.payment_time <= orders.order_time + interval 10 minutes
         """),
-        "leftOuter"  # Include orders without payments
+        "leftOuter"  # 包含無付款的訂單
     )
     .withColumn("matched", col("payment_id").isNotNull())
 )
@@ -130,9 +130,9 @@ matched.writeStream \
     .start("/delta/order_payments")
 ```
 
-### Pattern 2: Click-Conversion Attribution
+### 模式 2: 點擊-轉換歸因 (Click-Conversion Attribution)
 
-Attribute conversions to clicks within a time window:
+將轉換歸因於時間視窗內的點擊：
 
 ```python
 impressions = (spark
@@ -155,7 +155,7 @@ conversions = (spark
     .withWatermark("conversion_time", "1 hour")
 )
 
-# Attribute conversion to last impression within 24 hours
+# 將轉換歸因於 24 小時內的最後一次曝光
 attributed = (impressions
     .join(
         conversions,
@@ -177,9 +177,9 @@ attributed.writeStream \
     .start("/delta/attributed_conversions")
 ```
 
-### Pattern 3: Sessionization Across Streams
+### 模式 3: 跨串流工作階段化 (Sessionization)
 
-Group events from multiple streams into sessions:
+將來自多個串流的事件分組為工作階段：
 
 ```python
 from pyspark.sql.functions import session_window
@@ -204,7 +204,7 @@ clicks = (spark
     .withWatermark("event_time", "30 minutes")
 )
 
-# Create session windows for each stream
+# 為每個串流建立工作階段視窗
 pageview_sessions = (pageviews
     .groupBy(
         col("user_id"),
@@ -229,7 +229,7 @@ click_sessions = (clicks
     )
 )
 
-# Join sessions
+# 關聯工作階段
 joined_sessions = (pageview_sessions
     .join(
         click_sessions,
@@ -247,28 +247,28 @@ joined_sessions.writeStream \
     .start("/delta/user_sessions")
 ```
 
-### Pattern 4: Late Data Handling with Dead Letter Queue
+### 模式 4: 搭配死信佇列處理遲到資料
 
-Route late-arriving events to a separate table:
+將遲到事件路由至獨立資料表：
 
 ```python
 def write_with_late_data_handling(batch_df, batch_id):
-    """Separate on-time and late data"""
+    """分離準時與遲到資料"""
     from pyspark.sql.functions import current_timestamp, unix_timestamp
     
-    # Calculate delay
+    # 計算延遲
     processed = batch_df.withColumn(
         "processing_delay_seconds",
         unix_timestamp(current_timestamp()) - unix_timestamp(col("event_time"))
     )
     
-    # On-time data (within watermark)
-    on_time = processed.filter(col("processing_delay_seconds") < 600)  # 10 minutes
+    # 準時資料 (浮水印內)
+    on_time = processed.filter(col("processing_delay_seconds") < 600)  # 10 分鐘
     
-    # Late data
+    # 遲到資料
     late = processed.filter(col("processing_delay_seconds") >= 600)
     
-    # Write on-time data
+    # 寫入準時資料
     (on_time
         .drop("processing_delay_seconds")
         .write
@@ -279,7 +279,7 @@ def write_with_late_data_handling(batch_df, batch_id):
         .saveAsTable("matched_events")
     )
     
-    # Write late data to DLQ
+    # 寫入遲到資料至 DLQ
     if late.count() > 0:
         (late
             .withColumn("dlq_reason", lit("LATE_ARRIVAL"))
@@ -296,37 +296,37 @@ matched.writeStream \
     .start()
 ```
 
-## State Management
+## 狀態管理 (State Management)
 
-### Configure RocksDB for Large State
+### 為大型狀態設定 RocksDB
 
-For state stores exceeding memory capacity, use RocksDB:
+對於超過記憶體容量的狀態儲存，使用 RocksDB：
 
 ```python
-# Enable RocksDB state store provider
+# 啟用 RocksDB 狀態儲存提供者
 spark.conf.set(
     "spark.sql.streaming.stateStore.providerClass",
     "com.databricks.sql.streaming.state.RocksDBStateProvider"
 )
 
-# State is stored on disk, reducing memory pressure
-# Recommended for: High cardinality keys, long watermark durations
+# 狀態儲存在磁碟上，減少記憶體壓力
+# 推薦用於: 高基數鍵值、長浮水印期間
 ```
 
-### Monitor State Size
+### 監控狀態大小
 
 ```python
-# Read state store directly
+# 直接讀取狀態儲存
 state_df = (spark
     .read
     .format("statestore")
     .load("/checkpoints/orders_payments/state")
 )
 
-# Check partition balance
+# 檢查分區平衡
 state_df.groupBy("partitionId").count().orderBy(desc("count")).show()
 
-# Check state size
+# 檢查狀態大小
 state_metadata = (spark
     .read
     .format("state-metadata")
@@ -334,7 +334,7 @@ state_metadata = (spark
 )
 state_metadata.show()
 
-# Programmatic monitoring
+# 程式化監控
 for stream in spark.streams.active:
     progress = stream.lastProgress
     if progress and "stateOperators" in progress:
@@ -343,65 +343,65 @@ for stream in spark.streams.active:
             print(f"State memory: {op.get('memoryUsedBytes', 0)}")
 ```
 
-### Control State Growth
+### 控制狀態增長
 
 ```python
-# 1. Use watermarks (automatic cleanup)
-.withWatermark("event_time", "10 minutes")  # State expires after watermark
+# 1. 使用浮水印 (自動清理)
+.withWatermark("event_time", "10 minutes")  # 狀態在浮水印後過期
 
-# 2. Reduce key cardinality
-# Bad: user_id (millions of distinct values)
-# Good: session_id (expires naturally)
+# 2. 降低鍵值基數
+# 差: user_id (數百萬個相異值)
+# 好: session_id (自然過期)
 
-# 3. Set reasonable time bounds
-# Bad: unbounded time range
-expr("s2.ts >= s1.ts")  # State grows forever!
+# 3. 設定合理的時間邊界
+# 差: 無界限時間範圍
+expr("s2.ts >= s1.ts")  # 狀態永遠增長!
 
-# Good: bounded time range
+# 好: 有界限時間範圍
 expr("s2.ts BETWEEN s1.ts AND s1.ts + interval 1 hour")
 ```
 
-## Watermark Configuration
+## 浮水印設定 (Watermark Configuration)
 
-### Choosing Watermark Duration
+### 選擇浮水印期間
 
-Balance between latency and completeness:
+在延遲與完整性之間取得平衡：
 
 ```python
-# Rule of thumb: 2-3x the expected delay
-# If 99th percentile delay is 5 minutes → use 10-15 minute watermark
+# 經驗法則: 預期延遲的 2-3 倍
+# 若 99th 百分位延遲為 5 分鐘 → 使用 10-15 分鐘浮水印
 
-# High tolerance (more matches, larger state)
+# 高容忍度 (更多匹配, 較大狀態)
 .withWatermark("event_time", "2 hours")
 
-# Low tolerance (faster results, smaller state)
+# 低容忍度 (較快結果, 較小狀態)
 .withWatermark("event_time", "10 minutes")
 ```
 
-### Multiple Watermarks
+### 多重浮水印
 
-When joining streams with different latencies:
+當關聯不同延遲的串流時：
 
 ```python
-# Stream 1: Fast, low latency
+# 串流 1: 快速, 低延遲
 stream1 = stream1.withWatermark("ts", "5 minutes")
 
-# Stream 2: Slow, high latency
+# 串流 2: 慢速, 高延遲
 stream2 = stream2.withWatermark("ts", "15 minutes")
 
-# Effective watermark = max(5, 15) = 15 minutes
+# 有效浮水印 = max(5, 15) = 15 分鐘
 joined = stream1.join(stream2, join_condition, "inner")
 ```
 
-## Production Best Practices
+## 生產最佳實踐 (Production Best Practices)
 
-### Idempotent Writes
+### 冪等寫入 (Idempotent Writes)
 
-Ensure exactly-once semantics:
+確保 Exactly-once 語義：
 
 ```python
 def idempotent_write(batch_df, batch_id):
-    """Write with transaction version for idempotency"""
+    """具備交易版本的冪等寫入"""
     (batch_df
         .write
         .format("delta")
@@ -417,12 +417,12 @@ matched.writeStream \
     .start()
 ```
 
-### Multi-Stream Joins (3+ Streams)
+### 多串流關聯 (3+ 串流)
 
-Chain joins carefully - each adds state overhead:
+謹慎串連 Joins - 每個都會增加狀態開銷：
 
 ```python
-# Step 1: Join streams A and B
+# 步驟 1: Join 串流 A 與 B
 ab = (stream_a
     .withWatermark("ts", "10 minutes")
     .join(
@@ -432,35 +432,35 @@ ab = (stream_a
     )
 )
 
-# Step 2: Join result with stream C
+# 步驟 2: 將結果與串流 C 進行 Join
 abc = ab.join(
     stream_c.withWatermark("ts", "10 minutes"),
     expr("ab.key = c.key AND c.ts BETWEEN ab.ts - interval 5 min AND ab.ts + interval 5 min"),
     "inner"
 )
 
-# Note: Result watermark comes from left side (ab)
+# 註: 結果浮水印來自左側 (ab)
 ```
 
-### Performance Tuning
+### 效能調校
 
 ```python
-# State store batch retention
+# 狀態儲存批次保留
 spark.conf.set("spark.sql.streaming.stateStore.minBatchesToRetain", "2")
 
-# State maintenance interval
+# 狀態維護間隔
 spark.conf.set("spark.sql.streaming.stateStore.maintenanceInterval", "5m")
 
-# Shuffle partitions (match worker cores)
+# Shuffle 分區 (配合 Worker 核心數)
 spark.conf.set("spark.sql.shuffle.partitions", "200")
 ```
 
-## Monitoring
+## 監控 (Monitoring)
 
-### Key Metrics
+### 關鍵指標 (Key Metrics)
 
 ```python
-# Programmatic monitoring
+# 程式化監控
 for stream in spark.streams.active:
     status = stream.status
     progress = stream.lastProgress
@@ -470,119 +470,119 @@ for stream in spark.streams.active:
         print(f"Input rate: {progress.get('inputRowsPerSecond', 0)} rows/sec")
         print(f"Processing rate: {progress.get('processedRowsPerSecond', 0)} rows/sec")
         
-        # State metrics
+        # 狀態指標
         if "stateOperators" in progress:
             for op in progress["stateOperators"]:
                 print(f"State rows: {op.get('numRowsTotal', 0)}")
                 print(f"State memory: {op.get('memoryUsedBytes', 0)}")
         
-        # Watermark
+        # 浮水印
         if "eventTime" in progress:
             print(f"Watermark: {progress['eventTime'].get('watermark', 'N/A')}")
 ```
 
-### Spark UI Checks
+### Spark UI 檢查
 
-- **Streaming Tab**: Input rate vs processing rate (processing must exceed input)
-- **State Operators**: State size and memory usage
-- **Watermark**: Current watermark timestamp
-- **Batch Duration**: Should be < trigger interval
+- **Streaming Tab**: Input rate vs processing rate (Processing 必須超過 Input)
+- **State Operators**: 狀態大小與記憶體使用量
+- **Watermark**: 目前浮水印時間戳記
+- **Batch Duration**: 應 < trigger interval
 
-## Common Issues
+## 常見問題 (Common Issues)
 
-| Issue | Cause | Solution |
+| 問題 | 原因 | 解決方案 |
 |-------|-------|----------|
-| **State too large** | High cardinality keys or long watermark | Reduce key space; decrease watermark duration |
-| **Late events dropped** | Watermark too aggressive | Increase watermark delay |
-| **No matches** | Time condition wrong | Check time bounds and units (minutes vs hours) |
-| **OOM errors** | State explosion | Use RocksDB; increase memory; reduce watermark |
-| **Missing watermarks** | State grows forever | Always define watermarks on both sides |
-| **Unbounded state** | Open-ended time range | Use bounded time range in join condition |
+| **狀態過大** | 高基數鍵值或長浮水印 | 減少鍵值空間; 縮短浮水印期間 |
+| **遲到事件被丟棄** | 浮水印太激進 | 增加浮水印延遲 |
+| **無匹配** | 時間條件錯誤 | 檢查時間邊界與單位 (分 vs 時) |
+| **OOM 錯誤** | 狀態爆炸 | 使用 RocksDB; 增加記憶體; 減少浮水印 |
+| **缺少浮水印** | 狀態永遠增長 | 始終在雙方定義浮水印 |
+| **無界限狀態** | 開放式時間範圍 | 在 Join 條件中使用有界限的時間範圍 |
 
-## Production Checklist
+## 生產檢核清單 (Production Checklist)
 
-- [ ] Watermark configured on both streaming sources
-- [ ] Join condition includes explicit time bounds
-- [ ] State store provider set (RocksDB for large state)
-- [ ] State size monitored and alerts configured
-- [ ] Late data handling strategy defined (DLQ or tolerance)
-- [ ] Output mode is "append" (required for streaming joins)
-- [ ] Checkpoint location is unique per query
-- [ ] Idempotent writes configured (txnVersion/txnAppId)
-- [ ] Time zones normalized across streams
-- [ ] Performance metrics tracked (input rate, state size, watermark lag)
+- [ ] 雙方串流來源均設定浮水印
+- [ ] Join 條件包含明確的時間邊界
+- [ ] 設定狀態儲存提供者 (大型狀態使用 RocksDB)
+- [ ] 監控狀態大小並設定警報
+- [ ] 定義遲到資料處理策略 (DLQ 或容忍)
+- [ ] Output mode 為 "append" (串流 Join 必要)
+- [ ] 每個查詢使用唯一檢查點位置
+- [ ] 設定冪等寫入 (txnVersion/txnAppId)
+- [ ] 跨串流標準化時區
+- [ ] 追蹤效能指標 (Input rate, State size, Watermark lag)
 
-## Expert Tips
+## 專家提示 (Expert Tips)
 
-### Event Time vs Processing Time
+### 事件時間 vs 處理時間
 
-Always use event time for stream-stream joins:
+雙串流關聯始終使用事件時間：
 
 ```python
-# ✅ CORRECT: Event time (deterministic)
+# ✅ 正確: 事件時間 (確定性)
 .withWatermark("event_time", "10 minutes")
 
-# ❌ WRONG: Processing time (non-deterministic)
-# Processing time varies based on system load
-# Results are not reproducible
+# ❌ 錯誤: 處理時間 (非確定性)
+# 處理時間隨系統負載變化
+# 結果無法重現
 ```
 
-### Watermark Semantics Deep Dive
+### 浮水印語義深入探討
 
-Understanding watermark behavior:
+理解浮水印行為：
 
 ```python
 # Watermark = max_event_time - delay_threshold
-# Example: max_event_time = 10:15, delay = 10 min
+# 範例: max_event_time = 10:15, delay = 10 min
 # Watermark = 10:05
 
-# Events with timestamp < 10:05 are "too late"
-# - Inner join: May still match if other side hasn't expired
-# - Outer join: Dropped from outer side after watermark passes
+# 時間戳記 < 10:05 的事件為「過遲」
+# - Inner join: 若另一方尚未過期仍可能匹配
+# - Outer join: 浮水印通過後從 Outer 側丟棄
 
-# Effective watermark = max(left_watermark, right_watermark)
+# 有效浮水印 = max(left_watermark, right_watermark)
 ```
 
-### State Store Backend Selection
+### 狀態儲存後端選擇
 
-Choose the right state store backend:
+選擇正確的狀態儲存後端：
 
 ```python
-# Default: In-memory (fast but limited)
-# Use for: Small state (< 10GB), low cardinality keys
+# 預設: 記憶體內 (快但有限)
+# 用於: 小狀態 (< 10GB), 低基數鍵值
 
-# RocksDB: Disk-backed (slower but scalable)
+# RocksDB: 磁碟支援 (較慢但可擴展)
 spark.conf.set(
     "spark.sql.streaming.stateStore.providerClass",
     "com.databricks.sql.streaming.state.RocksDBStateProvider"
 )
-# Use for: Large state (> 10GB), high cardinality keys
+# 用於: 大狀態 (> 10GB), 高基數鍵值
 
-# Monitor state size to decide when to switch
+# 監控狀態大小以決定何時切換
 ```
 
-### Join Condition Best Practices
+### Join 條件最佳實踐
 
-Always include explicit time bounds:
+始終包含明確的時間邊界：
 
 ```python
-# ❌ BAD: Unbounded (state grows forever)
+# ❌ 差: 無界限 (狀態永遠增長)
 expr("s1.key = s2.key AND s2.ts >= s1.ts")
 
-# ✅ GOOD: Bounded (state bounded by watermark)
+# ✅ 好: 有界限 (狀態受浮水印限制)
 expr("""
     s1.key = s2.key AND
     s2.ts >= s1.ts - interval 5 minutes AND
     s2.ts <= s1.ts + interval 10 minutes
 """)
 
-# Why? Bounded ranges allow state cleanup
-# Unbounded ranges cause state to grow indefinitely
+# 原因? 有界限範圍允許狀態清理
+# 無界限範圍導致狀態無限增長
 ```
 
-## Related Skills
+## 相關技能 (Related Skills)
 
-- `stream-static-joins` - Enrich streams with Delta dimension tables
-- `kafka-to-delta` - Kafka ingestion patterns
-- `watermark-configuration` - Deep dive on watermark semantics
-- `state-store-management` - State store optimization and monitoring
+- `stream-static-joins` - 使用 Delta 維度表豐富串流
+- `kafka-to-delta` - Kafka 攝取模式
+- `watermark-configuration` - 浮水印語義深入探討
+- `state-store-management` - 狀態儲存優化與監控

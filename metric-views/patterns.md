@@ -1,12 +1,12 @@
-# Metric View Patterns & Examples
+# Metric View 模式與範例 (Metric View Patterns & Examples)
 
-Common patterns for creating and querying metric views.
+建立和查詢 Metric View 的常見模式。
 
-## Pattern 1: Simple Metrics from a Single Table
+## 模式 1：來自單一資料表的簡單指標
 
-The most basic pattern with direct column dimensions and standard aggregations.
+最基本的模式，具有直接的欄位維度和標準聚合。
 
-### Create
+### 建立
 
 ```sql
 CREATE OR REPLACE VIEW catalog.schema.product_metrics
@@ -31,10 +31,10 @@ AS $$
 $$
 ```
 
-### Query
+### 查詢
 
 ```sql
--- Revenue by product
+-- 依產品的收入
 SELECT
   `Product Name`,
   MEASURE(`Total Revenue`) AS revenue,
@@ -44,7 +44,7 @@ GROUP BY ALL
 ORDER BY revenue DESC
 LIMIT 10
 
--- Monthly trend
+-- 每月趨勢
 SELECT
   DATE_TRUNC('MONTH', `Sale Date`) AS month,
   MEASURE(`Total Revenue`) AS revenue
@@ -53,9 +53,9 @@ GROUP BY ALL
 ORDER BY month
 ```
 
-## Pattern 2: Derived Dimensions with CASE
+## 模式 2：使用 CASE 的衍生維度
 
-Transform raw values into business-friendly categories.
+將原始值轉換為商業友好的類別。
 
 ```sql
 CREATE OR REPLACE VIEW catalog.schema.order_kpis
@@ -88,9 +88,9 @@ AS $$
 $$
 ```
 
-## Pattern 3: Ratio Measures
+## 模式 3：比率度量
 
-Ratios and per-unit metrics that safely handle re-aggregation.
+能夠安全處理重新聚合的比率和每單位指標。
 
 ```sql
 CREATE OR REPLACE VIEW catalog.schema.efficiency_metrics
@@ -120,9 +120,9 @@ AS $$
 $$
 ```
 
-## Pattern 4: Filtered Measures (FILTER clause)
+## 模式 4：過濾後的度量 (FILTER 子句)
 
-Create measures that only count a subset of rows.
+建立僅計算部分資料列的度量。
 
 ```sql
 CREATE OR REPLACE VIEW catalog.schema.order_status_metrics
@@ -152,7 +152,7 @@ AS $$
 $$
 ```
 
-### Query filtered measures
+### 查詢過濾後的度量
 
 ```sql
 SELECT
@@ -166,9 +166,9 @@ GROUP BY ALL
 ORDER BY ALL
 ```
 
-## Pattern 5: Star Schema with Joins
+## 模式 5：帶有聯結的星狀架構
 
-Join a fact table to dimension tables.
+將事實資料表聯結到維度資料表。
 
 ```sql
 CREATE OR REPLACE VIEW catalog.schema.sales_analytics
@@ -210,9 +210,9 @@ AS $$
 $$
 ```
 
-## Pattern 6: Snowflake Schema (Nested Joins)
+## 模式 6：雪花架構 (巢狀聯結)
 
-Multi-level dimension hierarchies. Requires DBR 17.1+.
+多層級維度階層。需要 DBR 17.1+。
 
 ```sql
 CREATE OR REPLACE VIEW catalog.schema.geo_sales
@@ -253,17 +253,17 @@ AS $$
 $$
 ```
 
-### Query across hierarchy levels
+### 查詢跨階層級別
 
 ```sql
--- Revenue by region (rolls up across nations and customers)
+-- 依地區收入 (跨國家和客戶匯總)
 SELECT
   `Region`,
   MEASURE(`Total Revenue`) AS revenue
 FROM catalog.schema.geo_sales
 GROUP BY ALL
 
--- Revenue by nation within a specific region
+-- 特定地區內的國家收入
 SELECT
   `Nation`,
   MEASURE(`Total Revenue`) AS revenue,
@@ -274,9 +274,9 @@ GROUP BY ALL
 ORDER BY revenue DESC
 ```
 
-## Pattern 7: Materialized Metric View
+## 模式 7：具體化 Metric View
 
-Pre-compute common aggregations for faster queries.
+預先計算常見聚合以加快查詢速度。
 
 ```sql
 CREATE OR REPLACE VIEW catalog.schema.ecommerce_metrics
@@ -319,9 +319,9 @@ AS $$
 $$
 ```
 
-## Pattern 8: Using samples.tpch for Quick Demos
+## 模式 8：使用 samples.tpch 進行快速示範
 
-The TPC-H sample dataset is available on all Databricks workspaces.
+TPC-H 範例資料集可在所有 Databricks 工作區中使用。
 
 ```sql
 CREATE OR REPLACE VIEW catalog.schema.tpch_orders_metrics
@@ -363,10 +363,10 @@ AS $$
 $$
 ```
 
-### Demo queries
+### 示範查詢
 
 ```sql
--- Monthly revenue trend
+-- 每月收入趨勢
 SELECT
   `Order Month`,
   MEASURE(`Total Revenue`)::BIGINT AS revenue,
@@ -376,7 +376,7 @@ WHERE extract(year FROM `Order Month`) = 1995
 GROUP BY ALL
 ORDER BY ALL
 
--- Revenue by status
+-- 依狀態收入
 SELECT
   `Order Status`,
   MEASURE(`Total Revenue`)::BIGINT AS revenue,
@@ -384,7 +384,7 @@ SELECT
 FROM catalog.schema.tpch_orders_metrics
 GROUP BY ALL
 
--- Open orders risk assessment
+-- 開放訂單風險評估
 SELECT
   `Order Month`,
   MEASURE(`Open Order Revenue`)::BIGINT AS at_risk_revenue,
@@ -395,21 +395,21 @@ GROUP BY ALL
 ORDER BY ALL
 ```
 
-## Pattern 9: Window Measures (Experimental)
+## 模式 9：視窗度量 (實驗性)
 
-Window measures enable moving averages, running totals, period-over-period changes, and semiadditive measures. Add a `window` block to any measure definition. See [Window Measures Documentation](https://docs.databricks.com/aws/en/metric-views/data-modeling/window-measures).
+視窗度量啟用移動平均、累計總和、期間比較和半可加 (semiadditive) 度量。將 `window`區塊新增至任何度量定義。請參閱 [Window Measures Documentation](https://docs.databricks.com/aws/en/metric-views/data-modeling/window-measures)。
 
-### Window Range Values
+### 視窗範圍值
 
-| Range | Description |
+| 範圍 (Range) | 描述 |
 |-------|-------------|
-| `current` | Only rows where the window ordering value equals the current row |
-| `cumulative` | All rows up to and including the current row |
-| `trailing <N> <unit>` | N units before the current row (**excludes** current) |
-| `leading <N> <unit>` | N units after the current row |
-| `all` | All rows regardless of ordering |
+| `current` | 僅視窗排序值等於當前列的資料列 |
+| `cumulative` | 直至並包含當前列的所有資料列 |
+| `trailing <N> <unit>` | 當前列之前的 N 個單位 (**不包含** 當前列) |
+| `leading <N> <unit>` | 當前列之後的 N 個單位 |
+| `all` | 無論排序為何的所有資料列 |
 
-### Trailing Window: 7-Day Distinct Customers
+### 移動視窗：7 日不重複客戶
 
 ```sql
 CREATE OR REPLACE VIEW catalog.schema.customer_activity
@@ -434,9 +434,9 @@ AS $$
 $$
 ```
 
-**Key:** `trailing 7 day` includes the 7 days **before** each date, **excluding** the current date. `semiadditive: last` returns the last value when the `date` dimension is not in the GROUP BY.
+**關鍵：** `trailing 7 day` 包含每個日期之前的 7 天，**不包含** 當前日期。`semiadditive: last` 當 `date` 維度不在 GROUP BY 中時返回最後一個值。
 
-### Running Total (Cumulative)
+### 累計總和 (Cumulative)
 
 ```sql
 CREATE OR REPLACE VIEW catalog.schema.cumulative_sales
@@ -461,9 +461,9 @@ AS $$
 $$
 ```
 
-### Period-Over-Period: Day-Over-Day Growth
+### 期間比較：日增長率 (Day-Over-Day Growth)
 
-Compose window measures using `MEASURE()` references in derived measures.
+在衍生度量中使用 `MEASURE()` 引用來組合視窗度量。
 
 ```sql
 CREATE OR REPLACE VIEW catalog.schema.daily_growth
@@ -498,11 +498,11 @@ AS $$
 $$
 ```
 
-**Key:** The derived `day_over_day_growth` measure uses `MEASURE()` to reference other window measures. It does NOT need its own `window` block.
+**關鍵：** 衍生的 `day_over_day_growth` 度量使用 `MEASURE()` 引用其他視窗度量。它不需要自己的 `window` 區塊。
 
-### Year-to-Date (Composing Multiple Windows)
+### 年初至今 (組合多個視窗)
 
-A single measure can have multiple window specs to create period-to-date calculations.
+單一度量可以有多個視窗規範，以建立期間至今 (period-to-date) 的計算。
 
 ```sql
 CREATE OR REPLACE VIEW catalog.schema.ytd_metrics
@@ -532,11 +532,11 @@ AS $$
 $$
 ```
 
-**Key:** The first window does a cumulative sum over `date`. The second window restricts scope to the `current` year. Together they produce year-to-date.
+**關鍵：** 第一個視窗對 `date` 進行累計總和。第二個視窗將範圍限制為 `current` 年。它們一起產生年初至今的結果。
 
-### Semiadditive Measure: Bank Balance
+### 半可加度量：銀行餘額
 
-For measures like balances that should not be summed across time.
+對於像餘額這樣不應跨時間加總的度量。
 
 ```sql
 CREATE OR REPLACE VIEW catalog.schema.account_balances
@@ -562,11 +562,11 @@ AS $$
 $$
 ```
 
-**Key:** `semiadditive: last` prevents summing across dates (returns the last date's value instead), but the measure **still aggregates across other dimensions** like `customer`. When grouped by date, you get total balance across all customers for that day. When not grouped by date, you get the balance from the most recent date.
+**關鍵：** `semiadditive: last` 防止跨日期加總 (而是返回最後日期的值)，但度量 **仍然跨其他維度聚合**，如 `customer`。當按日期分組時，您會得到當天所有客戶的總餘額。當不按日期分組時，您會得到最近日期的餘額。
 
-### Query window measures
+### 查詢視窗度量
 
-Window measures are queried with the same `MEASURE()` syntax:
+視窗度量使用相同的 `MEASURE()` 語法進行查詢：
 
 ```sql
 SELECT
@@ -579,9 +579,9 @@ GROUP BY ALL
 ORDER BY ALL
 ```
 
-## MCP Tool Examples
+## MCP 工具範例
 
-### Create with joins
+### 建立 (包含聯結)
 
 ```python
 manage_metric_views(
@@ -614,7 +614,7 @@ manage_metric_views(
 )
 ```
 
-### Alter to add a new measure
+### 修改 (Alter) 以新增度量
 
 ```python
 manage_metric_views(
@@ -636,7 +636,7 @@ manage_metric_views(
 )
 ```
 
-### Query with filters
+### 帶有過濾器的查詢
 
 ```python
 manage_metric_views(

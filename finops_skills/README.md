@@ -14,6 +14,40 @@
 
 ---
 
+## 🏗️ 技能架構圖 (Skills Architecture)
+
+```mermaid
+graph TD
+    User[👤 使用者 (User/Chatbot)] -->|自然語言提問| Intent[🧠 意圖識別 & 路由]
+    
+    subgraph "核心技能模組 (Core Skills)"
+        Intent -->|成本優化| Optimization[💰 成本優化模式]
+        Intent -->|異常監控| Anomaly[🚨 進階異常檢測]
+        Intent -->|成本分攤| Chargeback[💳 成本回收與展示]
+        Intent -->|KPI 追蹤| KPI[📊 FinOps KPI 指標]
+        Intent -->|資料驗證| DataQuality[✅ 資料品質驗證]
+        Intent -->|儀表板| Dashboard[📈 儀表板查詢]
+    end
+
+    subgraph "資料層 (Data Architecture)"
+        Gold[(🏆 Gold 層: 每日聚合)] 
+        Silver[(🥈 Silver 層: 清理豐富化)]
+        Bronze[(🥉 Bronze 層: 原始匯出)]
+
+        Optimization -->|查詢| Silver & Gold
+        Anomaly -->|查詢| Gold
+        Chargeback -->|查詢| Gold & Silver
+        KPI -->|查詢| Gold
+        Dashboard -->|查詢| Gold
+        DataQuality -->|驗證| Bronze & Silver & Gold
+        
+        Silver -->|聚合| Gold
+        Bronze -->|ETL| Silver
+    end
+```
+
+---
+
 ## 👥 適用角色
 
 | 角色 | 主要使用場景 |

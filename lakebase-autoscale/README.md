@@ -1,55 +1,55 @@
 # Lakebase Autoscaling
 
-Patterns and best practices for using Lakebase Autoscaling (next-gen managed PostgreSQL) with autoscaling, branching, scale-to-zero, and instant restore.
+使用 Lakebase Autoscaling (下一代託管 PostgreSQL) 的模式和最佳實踐，包含自動擴展、分支、縮減至零和即時還原。
 
-## Overview
+## 概述
 
-This skill covers Lakebase Autoscaling, Databricks' next-generation managed PostgreSQL database service with autoscaling compute, Git-like branching, scale-to-zero, and instant point-in-time restore. It activates when building applications that need an operational database with dynamic scaling, working with database branching for dev/test workflows, implementing reverse ETL from Delta Lake, or managing Lakebase Autoscaling projects, branches, and computes via SDK, CLI, or MCP tools.
+此技能涵蓋 Lakebase Autoscaling，這是 Databricks 的下一代託管 PostgreSQL 資料庫服務，具有自動擴展計算、類似 Git 的分支、縮減至零和即時時間點還原功能。當建構需要具有動態擴展的操作資料庫的應用程式、為開發/測試工作流程使用資料庫分支、實作從 Delta Lake 的反向 ETL，或透過 SDK、CLI 或 MCP 工具管理 Lakebase Autoscaling 專案、分支和計算時，此技能會啟動。
 
-## What's Included
+## 包含內容
 
 ```
 lakebase-autoscale/
-├── SKILL.md                 # Main skill: quick start, common patterns, CLI reference, troubleshooting
-├── projects.md              # Project management patterns and settings
-├── branches.md              # Branching workflows, protection, and expiration
-├── computes.md              # Compute sizing, autoscaling, and scale-to-zero
-├── connection-patterns.md   # Connection methods (psycopg, SQLAlchemy, pooling, DNS workaround)
-└── reverse-etl.md           # Syncing data from Delta Lake tables to Lakebase PostgreSQL
+├── SKILL.md                 # 主要技能：快速開始、常見模式、CLI 參考、疑難排解
+├── projects.md              # 專案管理模式和設定
+├── branches.md              # 分支工作流程、保護和到期
+├── computes.md              # 計算調整、自動擴展和縮減至零
+├── connection-patterns.md   # 連線方法 (psycopg, SQLAlchemy, pooling, DNS workaround)
+└── reverse-etl.md           # 將資料從 Delta Lake tables 同步到 Lakebase PostgreSQL
 ```
 
-## Key Topics
+## 關鍵主題
 
-- Creating and managing Lakebase Autoscaling projects (top-level containers)
-- Branch management: create, protect, expire, reset from parent
-- Compute sizing from 0.5 to 112 CU with autoscaling ranges
-- Scale-to-zero configuration for cost optimization
-- OAuth token generation and automatic refresh (1-hour expiry)
-- Direct psycopg3 connections for scripts and notebooks
-- SQLAlchemy async engine with connection pooling and token injection
-- DNS resolution workaround for macOS
-- Reverse ETL: synced tables with Snapshot, Triggered, and Continuous modes
-- CLI commands for project/branch/compute lifecycle management
-- Key differences from Lakebase Provisioned
+- 建立和管理 Lakebase Autoscaling 專案 (頂層容器)
+- 分支管理：建立、保護、到期、從父分支重設
+- 從 0.5 到 112 CU 的計算調整，具有自動擴展範圍
+- 用於成本優化的縮減至零配置
+- OAuth 權杖產生和自動重新整理 (1 小時到期)
+- 用於腳本和筆記本的直接 psycopg3 連線
+- 具有連線池和權杖注入的 SQLAlchemy 非同步引擎
+- 適用於 macOS 的 DNS 解析解決方案
+- 反向 ETL：具有 Snapshot、Triggered 和 Continuous 模式的同步資料表
+- 用於專案/分支/計算生命週期管理的 CLI 命令
+- 與 Lakebase Provisioned 的主要差異
 
-## When to Use
+## 何時使用
 
-- Building applications that need a PostgreSQL database with autoscaling compute
-- Working with database branching for dev/test/staging workflows
-- Adding persistent state to applications with scale-to-zero cost savings
-- Implementing reverse ETL from Delta Lake to an operational database via synced tables
-- Managing Lakebase Autoscaling projects, branches, computes, or credentials
+- 建構需要具有自動擴展計算能力的 PostgreSQL 資料庫的應用程式
+- 為開發/測試/預備工作流程使用資料庫分支
+- 為應用程式新增持久狀態，並透過縮減至零節省成本
+- 透過同步資料表 (synced tables) 實作從 Delta Lake 到操作資料庫的反向 ETL
+- 管理 Lakebase Autoscaling 專案、分支、計算或認證
 
-## Related Skills
+## 相關技能
 
-- [Lakebase Provisioned](../lakebase-provisioned/) -- fixed-capacity managed PostgreSQL (predecessor)
-- [Databricks Apps (APX)](../databricks-app-apx/) -- full-stack apps that can use Lakebase for persistence
-- [Databricks Apps (Python)](../databricks-app-python/) -- Python apps with Lakebase backend
-- [Databricks Python SDK](../databricks-python-sdk/) -- SDK used for project management and token generation
-- [Asset Bundles](../asset-bundles/) -- deploying apps with Lakebase resources
-- [Databricks Jobs](../databricks-jobs/) -- scheduling reverse ETL sync jobs
+- [Lakebase Provisioned](../lakebase-provisioned/) -- 固定容量託管 PostgreSQL (前身)
+- [Databricks Apps (APX)](../databricks-app-apx/) -- 可以使用 Lakebase 進行持久化的全端應用程式
+- [Databricks Apps (Python)](../databricks-app-python/) -- 具有 Lakebase 後端的 Python 應用程式
+- [Databricks Python SDK](../databricks-python-sdk/) -- 用於專案管理和權杖產生的 SDK
+- [Asset Bundles](../asset-bundles/) -- 部署具有 Lakebase 資源的應用程式
+- [Databricks Jobs](../databricks-jobs/) -- 排程反向 ETL 同步作業
 
-## Resources
+## 資源
 
 - [Lakebase Autoscaling Documentation](https://docs.databricks.com/aws/en/oltp/projects/)
 - [Lakebase Autoscaling API Guide](https://docs.databricks.com/aws/en/oltp/projects/api-usage)

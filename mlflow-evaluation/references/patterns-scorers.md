@@ -1,45 +1,45 @@
-# MLflow 3 Scorer Patterns
+# MLflow 3 評分器模式 (MLflow 3 Scorer Patterns)
 
-Working code patterns for creating and using scorers in MLflow 3 GenAI.
+在 MLflow 3 GenAI 中建立和使用評分器的工作程式碼模式。
 
-## Table of Contents
+## 目錄
 
-| # | Pattern | Description |
+| # | 模式 | 描述 |
 |---|---------|-------------|
-| 1 | [Built-in Guidelines Scorer](#pattern-1-built-in-guidelines-scorer) | Natural language criteria evaluation |
-| 2 | [Correctness with Ground Truth](#pattern-2-correctness-scorer-with-ground-truth) | Expected answers/facts validation |
-| 3 | [RAG with RetrievalGroundedness](#pattern-3-rag-evaluation-with-retrievalgroundedness) | Check responses grounded in context |
-| 4 | [Simple Custom Scorer (Boolean)](#pattern-4-simple-custom-scorer-boolean) | Pass/fail checks |
-| 5 | [Custom Scorer with Feedback](#pattern-5-custom-scorer-with-feedback-object) | Return rationale and custom names |
-| 6 | [Multiple Metrics Scorer](#pattern-6-custom-scorer-with-multiple-metrics) | One scorer, multiple metrics |
-| 7 | [Wrapping LLM Judge](#pattern-7-custom-scorer-wrapping-llm-judge) | Custom context for built-in judges |
-| 8 | [Trace-Based Scorer](#pattern-8-trace-based-scorer) | Analyze execution details |
-| 9 | [Class-Based Scorer](#pattern-9-class-based-scorer-with-configuration) | Configurable/stateful scorers |
-| 10 | [Conditional Scoring](#pattern-10-conditional-scoring-based-on-input) | Different rules per input type |
-| 11 | [Aggregations](#pattern-11-scorer-with-aggregations) | Numeric stats (mean, median, p90) |
-| 12 | [Custom Make Judge](#pattern-12-custom-make-judge) | Complex multi-level evaluation |
-| 13 | [Per-Stage Accuracy](#pattern-13-per-stagecomponent-accuracy-scorer) | Multi-agent component verification |
-| 14 | [Tool Selection Accuracy](#pattern-14-tool-selection-accuracy-scorer) | Verify correct tools called |
-| 15 | [Stage Latency Scorer](#pattern-15-stage-latency-scorer-multiple-metrics) | Per-stage latency metrics |
-| 16 | [Component Accuracy Factory](#pattern-16-component-accuracy-factory) | Reusable scorer factory |
+| 1 | [內建 Guidelines 評分器](#模式-1-內建-guidelines-評分器) | 自然語言標準評估 |
+| 2 | [帶有基本真值的 Correctness](#模式-2-帶有基本真值的-correctness-評分器) | 預期答案/事實驗證 |
+| 3 | [帶有 RetrievalGroundedness 的 RAG](#模式-3-帶有-retrievalgroundedness-的-rag-評估) | 檢查回應是否基於上下文 |
+| 4 | [簡單自訂評分器 (布林值)](#模式-4-簡單自訂評分器-布林值) | 通過/失敗檢查 |
+| 5 | [帶有 Feedback 的自訂評分器](#模式-5-帶有-feedback-物件的自訂評分器) | 返回基本原理和自訂名稱 |
+| 6 | [多指標評分器](#模式-6-帶有多指標的自訂評分器) | 一個評分器，多個指標 |
+| 7 | [包裝 LLM 裁判](#模式-7-包裝-llm-裁判的自訂評分器) | 內建裁判的自訂上下文 |
+| 8 | [基於追蹤的評分器](#模式-8-基於追蹤的評分器) | 分析執行細節 |
+| 9 | [基於類別的評分器](#模式-9-帶有配置的基於類別的評分器) | 可配置/有狀態的評分器 |
+| 10 | [條件式評分](#模式-10-基於輸入的條件式評分) | 每個輸入類型有不同規則 |
+| 11 | [聚合](#模式-11-帶有聚合的評分器) | 數值統計 (平均值, 中位數, p90) |
+| 12 | [自訂建立裁判](#模式-12-自訂建立裁判-make-judge) | 複雜的多層級評估 |
+| 13 | [每階段準確率](#模式-13-每階段元件準確率評分器) | 多代理元件驗證 |
+| 14 | [工具選擇準確率](#模式-14-工具選擇準確率評分器) | 驗證呼叫了正確的工具 |
+| 15 | [階段延遲評分器](#模式-15-階段延遲評分器-多指標) | 每個階段的延遲指標 |
+| 16 | [元件準確率工廠](#模式-16-元件準確率工廠) | 可重用的評分器工廠 |
 
 ---
 
-## Pattern 1: Built-in Guidelines Scorer
+## 模式 1：內建 Guidelines 評分器
 
-Use for evaluating against natural language criteria.
+用於根據自然語言標準進行評估。
 
 ```python
 from mlflow.genai.scorers import Guidelines
 import mlflow
 
-# Single guideline
+# 單一準則
 tone_scorer = Guidelines(
     name="professional_tone",
     guidelines="The response must maintain a professional, helpful tone throughout"
 )
 
-# Multiple guidelines (evaluated together)
+# 多個準則 (一起評估)
 quality_scorer = Guidelines(
     name="response_quality",
     guidelines=[
@@ -49,14 +49,14 @@ quality_scorer = Guidelines(
     ]
 )
 
-# With custom judge model
+# 帶有自訂裁判模型
 custom_scorer = Guidelines(
     name="custom_check",
     guidelines="Response must follow company policy",
     model="databricks:/databricks-gpt-oss-120b"
 )
 
-# Use in evaluation
+# 在評估中使用
 results = mlflow.genai.evaluate(
     data=eval_dataset,
     predict_fn=my_app,
@@ -66,14 +66,14 @@ results = mlflow.genai.evaluate(
 
 ---
 
-## Pattern 2: Correctness Scorer with Ground Truth
+## 模式 2：帶有基本真值的 Correctness 評分器
 
-Use when you have expected answers or facts.
+當您有預期答案或事實時使用。
 
 ```python
 from mlflow.genai.scorers import Correctness
 
-# Dataset with expected facts
+# 帶有預期事實的資料集
 eval_data = [
     {
         "inputs": {"question": "What is MLflow?"},
@@ -102,20 +102,20 @@ results = mlflow.genai.evaluate(
 
 ---
 
-## Pattern 3: RAG Evaluation with RetrievalGroundedness
+## 模式 3：帶有 RetrievalGroundedness 的 RAG 評估
 
-Use for RAG applications to check if responses are grounded in retrieved context.
+用於 RAG 應用程式，檢查回應是否基於檢索到的上下文。
 
 ```python
 from mlflow.genai.scorers import RetrievalGroundedness, RelevanceToQuery
 import mlflow
 from mlflow.entities import Document
 
-# App must have RETRIEVER span type
+# 應用程式必須有 RETRIEVER span 類型
 @mlflow.trace(span_type="RETRIEVER")
 def retrieve_docs(query: str) -> list[Document]:
     """Retrieval function marked with RETRIEVER span type."""
-    # Your retrieval logic
+    # 您的檢索邏輯
     return [
         Document(
             id="doc1",
@@ -132,36 +132,36 @@ def rag_app(query: str):
     response = generate_response(query, context)
     return {"response": response}
 
-# Evaluate with RAG-specific scorers
+# 使用 RAG 特定評分器進行評估
 results = mlflow.genai.evaluate(
     data=eval_data,
     predict_fn=rag_app,
     scorers=[
-        RetrievalGroundedness(),  # Checks response vs retrieved docs
-        RelevanceToQuery(),        # Checks if response addresses query
+        RetrievalGroundedness(),  # 檢查回應與檢索文件的關係
+        RelevanceToQuery(),        # 檢查回應是否針對查詢
     ]
 )
 ```
 
 ---
 
-## Pattern 4: Simple Custom Scorer (Boolean)
+## 模式 4：簡單自訂評分器 (布林值)
 
-Use for simple pass/fail checks.
+用於簡單的通過/失敗檢查。
 
 ```python
 from mlflow.genai.scorers import scorer
 
 @scorer
 def contains_greeting(outputs):
-    """Check if response contains a greeting."""
+    """檢查回應是否包含問候。"""
     response = outputs.get("response", "").lower()
     greetings = ["hello", "hi", "hey", "greetings"]
     return any(g in response for g in greetings)
 
 @scorer
 def response_not_empty(outputs):
-    """Check if response is not empty."""
+    """檢查回應是否不為空。"""
     return len(str(outputs.get("response", ""))) > 0
 
 results = mlflow.genai.evaluate(
@@ -173,9 +173,9 @@ results = mlflow.genai.evaluate(
 
 ---
 
-## Pattern 5: Custom Scorer with Feedback Object
+## 模式 5：帶有 Feedback 物件的自訂評分器
 
-Use when you need rationale or custom names.
+當您需要基本原理或自訂名稱時使用。
 
 ```python
 from mlflow.genai.scorers import scorer
@@ -183,7 +183,7 @@ from mlflow.entities import Feedback
 
 @scorer
 def response_length_check(outputs):
-    """Check if response length is appropriate."""
+    """檢查回應長度是否適當。"""
     response = str(outputs.get("response", ""))
     word_count = len(response.split())
     
@@ -206,9 +206,9 @@ def response_length_check(outputs):
 
 ---
 
-## Pattern 6: Custom Scorer with Multiple Metrics
+## 模式 6：帶有多指標的自訂評分器
 
-Use when one scorer should produce multiple metrics.
+當一個評分器應該產生多個指標時使用。
 
 ```python
 from mlflow.genai.scorers import scorer
@@ -216,20 +216,20 @@ from mlflow.entities import Feedback
 
 @scorer
 def comprehensive_check(inputs, outputs):
-    """Return multiple metrics from one scorer."""
+    """從一個評分器返回多個指標。"""
     response = str(outputs.get("response", ""))
     query = inputs.get("query", "")
     
     feedbacks = []
     
-    # Check 1: Response exists
+    # 檢查 1：回應存在
     feedbacks.append(Feedback(
         name="has_response",
         value=len(response) > 0,
         rationale="Response is present" if response else "No response"
     ))
     
-    # Check 2: Word count
+    # 檢查 2：字數統計
     word_count = len(response.split())
     feedbacks.append(Feedback(
         name="word_count",
@@ -237,7 +237,7 @@ def comprehensive_check(inputs, outputs):
         rationale=f"Response contains {word_count} words"
     ))
     
-    # Check 3: Query terms in response
+    # 檢查 3：回應中的查詢術語
     query_terms = set(query.lower().split())
     response_terms = set(response.lower().split())
     overlap = len(query_terms & response_terms) / len(query_terms) if query_terms else 0
@@ -252,9 +252,9 @@ def comprehensive_check(inputs, outputs):
 
 ---
 
-## Pattern 7: Custom Scorer Wrapping LLM Judge
+## 模式 7：包裝 LLM 裁判的自訂評分器
 
-Use when you need custom context for built-in judges.
+當您需要為內建裁判提供自訂上下文時使用。
 
 ```python
 from mlflow.genai.scorers import scorer
@@ -262,16 +262,16 @@ from mlflow.genai.judges import meets_guidelines
 
 @scorer
 def custom_grounding_check(inputs, outputs, trace=None):
-    """Check if response is grounded with custom context extraction."""
+    """使用自訂上下文提取檢查回應是否有依據。"""
     
-    # Extract what you need from inputs/outputs
+    # 從 inputs/outputs 提取您需要的內容
     query = inputs.get("query", "")
     response = outputs.get("response", "")
     
-    # Get retrieved docs from outputs (or extract from trace)
+    # 從 outputs 獲取檢索到的文件 (或從 trace 提取)
     retrieved_docs = outputs.get("retrieved_documents", [])
     
-    # Call the judge with custom context
+    # 使用自訂上下文呼叫裁判
     return meets_guidelines(
         name="factual_grounding",
         guidelines=[
@@ -288,9 +288,9 @@ def custom_grounding_check(inputs, outputs, trace=None):
 
 ---
 
-## Pattern 8: Trace-Based Scorer
+## 模式 8：基於追蹤的評分器
 
-Use when you need to analyze execution details.
+當您需要分析執行細節時使用。
 
 ```python
 from mlflow.genai.scorers import scorer
@@ -298,9 +298,9 @@ from mlflow.entities import Feedback, Trace, SpanType
 
 @scorer
 def llm_latency_check(trace: Trace) -> Feedback:
-    """Check if LLM response time is acceptable."""
+    """檢查 LLM 回應時間是否可接受。"""
     
-    # Find LLM spans in trace
+    # 在追蹤中尋找 LLM spans
     llm_spans = trace.search_spans(span_type=SpanType.CHAT_MODEL)
     
     if not llm_spans:
@@ -309,13 +309,13 @@ def llm_latency_check(trace: Trace) -> Feedback:
             rationale="No LLM calls found in trace"
         )
     
-    # Calculate total LLM time
+    # 計算總 LLM 時間
     total_llm_time = 0
     for span in llm_spans:
         duration = (span.end_time_ns - span.start_time_ns) / 1e9
         total_llm_time += duration
     
-    max_acceptable = 5.0  # seconds
+    max_acceptable = 5.0  # 秒
     
     if total_llm_time <= max_acceptable:
         return Feedback(
@@ -330,7 +330,7 @@ def llm_latency_check(trace: Trace) -> Feedback:
 
 @scorer  
 def tool_usage_check(trace: Trace) -> Feedback:
-    """Check if appropriate tools were called."""
+    """檢查是否呼叫了適當的工具。"""
     
     tool_spans = trace.search_spans(span_type=SpanType.TOOL)
     
@@ -344,9 +344,9 @@ def tool_usage_check(trace: Trace) -> Feedback:
 
 ---
 
-## Pattern 9: Class-Based Scorer with Configuration
+## 模式 9：帶有配置的基於類別的評分器
 
-Use when scorer needs persistent state or configuration.
+當評分器需要持久狀態或配置時使用。
 
 ```python
 from mlflow.genai.scorers import Scorer
@@ -354,7 +354,7 @@ from mlflow.entities import Feedback
 from typing import Optional, List
 
 class KeywordRequirementScorer(Scorer):
-    """Configurable scorer that checks for required keywords."""
+    """檢查必要關鍵字的特定配置評分器。"""
     
     name: str = "keyword_requirement"
     required_keywords: List[str] = []
@@ -382,7 +382,7 @@ class KeywordRequirementScorer(Scorer):
                 rationale=f"Missing keywords: {missing}"
             )
 
-# Use with different configurations
+# 使用不同的配置
 product_scorer = KeywordRequirementScorer(
     name="product_mentions",
     required_keywords=["MLflow", "Databricks"],
@@ -404,21 +404,21 @@ results = mlflow.genai.evaluate(
 
 ---
 
-## Pattern 10: Conditional Scoring Based on Input
+## 模式 10：基於輸入的條件式評分
 
-Use when different inputs need different evaluation.
+當不同的輸入需要不同的評估時使用。
 
 ```python
 from mlflow.genai.scorers import scorer, Guidelines
 
 @scorer
 def conditional_scorer(inputs, outputs):
-    """Apply different guidelines based on query type."""
+    """根據查詢類型應用不同的準則。"""
     
     query = inputs.get("query", "").lower()
     
     if "technical" in query or "how to" in query:
-        # Technical queries need detailed responses
+        # 技術查詢需要詳細的回應
         judge = Guidelines(
             name="technical_quality",
             guidelines=[
@@ -427,7 +427,7 @@ def conditional_scorer(inputs, outputs):
             ]
         )
     elif "price" in query or "cost" in query:
-        # Pricing queries need specific info
+        # 定價查詢需要特定資訊
         judge = Guidelines(
             name="pricing_quality",
             guidelines=[
@@ -436,7 +436,7 @@ def conditional_scorer(inputs, outputs):
             ]
         )
     else:
-        # General queries
+        # 一般查詢
         judge = Guidelines(
             name="general_quality",
             guidelines=[
@@ -450,39 +450,39 @@ def conditional_scorer(inputs, outputs):
 
 ---
 
-## Pattern 11: Scorer with Aggregations
+## 模式 11：帶有聚合的評分器
 
-Use for numeric scorers that need aggregate statistics.
+用於需要聚合統計的數值評分器。
 
 ```python
 from mlflow.genai.scorers import scorer
 
 @scorer(aggregations=["mean", "min", "max", "median", "p90"])
 def response_latency(outputs) -> float:
-    """Return response generation time."""
-    return outputs.get("latency_ms", 0) / 1000.0  # Convert to seconds
+    """返回回應生成時間。"""
+    return outputs.get("latency_ms", 0) / 1000.0  # 轉換為秒
 
 @scorer(aggregations=["mean", "min", "max"])
 def token_count(outputs) -> int:
-    """Return token count from response."""
+    """返回回應中的 Token 數量。"""
     response = str(outputs.get("response", ""))
-    # Rough token estimate
+    # 粗略的 Token 估計
     return len(response.split())
 
-# Valid aggregations: min, max, mean, median, variance, p90
-# NOTE: p50, p99, sum are NOT valid - use median instead of p50
+# 有效的聚合: min, max, mean, median, variance, p90
+# 注意: p50, p99, sum 不是有效的 - 使用 median 代替 p50
 ```
 
 ---
 
-## Pattern 12: Custom Make Judge
+## 模式 12：自訂建立裁判 (make_judge)
 
-Use for complex multi-level evaluation with custom instructions.
+用於帶有自訂指令的複雜多層級評估。
 
 ```python
 from mlflow.genai.judges import make_judge
 
-# Issue resolution judge with multiple outcomes
+# 帶有多種結果的問題解決裁判
 resolution_judge = make_judge(
     name="issue_resolution",
     instructions="""
@@ -498,10 +498,10 @@ resolution_judge = make_judge(
     
     Your response must be exactly one of these three values.
     """,
-    model="databricks:/databricks-gpt-5-mini"  # Optional
+    model="databricks:/databricks-gpt-5-mini"  # 選擇性
 )
 
-# Use in evaluation
+# 在評估中使用
 results = mlflow.genai.evaluate(
     data=eval_data,
     predict_fn=support_agent,
@@ -511,7 +511,7 @@ results = mlflow.genai.evaluate(
 
 ---
 
-## Combining Multiple Scorer Types
+## 組合多種評分器類型
 
 ```python
 from mlflow.genai.scorers import (
@@ -520,23 +520,23 @@ from mlflow.genai.scorers import (
 )
 from mlflow.entities import Feedback
 
-# Built-in scorers
+# 內建評分器
 safety = Safety()
 relevance = RelevanceToQuery()
 
-# Guidelines scorers
+# Guidelines 評分器
 tone = Guidelines(name="tone", guidelines="Must be professional")
 format_check = Guidelines(name="format", guidelines="Must use bullet points for lists")
 
-# Custom code scorer
+# 自訂程式碼評分器
 @scorer
 def has_cta(outputs):
-    """Check for call-to-action."""
+    """檢查是否有行動呼籲 (call-to-action)。"""
     response = outputs.get("response", "").lower()
     ctas = ["contact us", "learn more", "get started", "sign up"]
     return any(cta in response for cta in ctas)
 
-# Combine all
+# 組合所有
 results = mlflow.genai.evaluate(
     data=eval_data,
     predict_fn=my_app,
@@ -552,9 +552,9 @@ results = mlflow.genai.evaluate(
 
 ---
 
-## Pattern 13: Per-Stage/Component Accuracy Scorer
+## 模式 13：每階段/元件準確率評分器
 
-Use for multi-agent or multi-stage pipelines to verify each component works correctly.
+用於多代理或多階段管線，以驗證每個元件是否正確運作。
 
 ```python
 from mlflow.genai.scorers import scorer
@@ -568,7 +568,7 @@ def classifier_accuracy(
     expectations: Dict[str, Any],
     trace: Trace
 ) -> Feedback:
-    """Check if classifier correctly identified the query type."""
+    """檢查分類器是否正確識別了查詢類型。"""
 
     expected_type = expectations.get("expected_query_type")
 
@@ -579,7 +579,7 @@ def classifier_accuracy(
             rationale="No expected_query_type in expectations"
         )
 
-    # Find classifier span in trace by name pattern
+    # 依名稱模式在追蹤中尋找分類器 span
     classifier_spans = [
         span for span in trace.search_spans()
         if "classifier" in span.name.lower()
@@ -592,7 +592,7 @@ def classifier_accuracy(
             rationale="No classifier span found in trace"
         )
 
-    # Extract actual value from span outputs
+    # 從 span 輸出中提取實際值
     span_outputs = classifier_spans[0].outputs or {}
     actual_type = span_outputs.get("query_type") if isinstance(span_outputs, dict) else None
 
@@ -614,9 +614,9 @@ def classifier_accuracy(
 
 ---
 
-## Pattern 14: Tool Selection Accuracy Scorer
+## 模式 14：工具選擇準確率評分器
 
-Check if the correct tools were called during agent execution.
+檢查在代理執行期間是否呼叫了正確的工具。
 
 ```python
 from mlflow.genai.scorers import scorer
@@ -630,7 +630,7 @@ def tool_selection_accuracy(
     expectations: Dict[str, Any],
     trace: Trace
 ) -> Feedback:
-    """Check if the correct tools were called."""
+    """檢查是否呼叫了正確的工具。"""
 
     expected_tools = expectations.get("expected_tools", [])
 
@@ -641,18 +641,18 @@ def tool_selection_accuracy(
             rationale="No expected_tools in expectations"
         )
 
-    # Get actual tool calls from TOOL spans
+    # 從 TOOL spans 獲取實際工具呼叫
     tool_spans = trace.search_spans(span_type=SpanType.TOOL)
     actual_tools = {span.name for span in tool_spans}
 
-    # Normalize names (handle fully qualified names like "catalog.schema.func")
+    # 正規化名稱 (處理如 "catalog.schema.func" 的全限定名稱)
     def normalize(name: str) -> str:
         return name.split(".")[-1] if "." in name else name
 
     expected_normalized = {normalize(t) for t in expected_tools}
     actual_normalized = {normalize(t) for t in actual_tools}
 
-    # Check if all expected tools were called
+    # 檢查是否呼叫了所有預期的工具
     missing = expected_normalized - actual_normalized
     extra = actual_normalized - expected_normalized
 
@@ -671,9 +671,9 @@ def tool_selection_accuracy(
 
 ---
 
-## Pattern 15: Stage Latency Scorer (Multiple Metrics)
+## 模式 15：階段延遲評分器 (多指標)
 
-Measure latency per pipeline stage and identify bottlenecks.
+測量每個管線階段的延遲並識別瓶頸。
 
 ```python
 from mlflow.genai.scorers import scorer
@@ -682,12 +682,12 @@ from typing import List
 
 @scorer
 def stage_latency_scorer(trace: Trace) -> List[Feedback]:
-    """Measure latency for each pipeline stage."""
+    """測量每個管線階段的延遲。"""
 
     feedbacks = []
     all_spans = trace.search_spans()
 
-    # Total trace time
+    # 總追蹤時間
     root_spans = [s for s in all_spans if s.parent_id is None]
     if root_spans:
         root = root_spans[0]
@@ -698,7 +698,7 @@ def stage_latency_scorer(trace: Trace) -> List[Feedback]:
             rationale=f"Total execution time: {total_ms:.2f}ms"
         ))
 
-    # Per-stage latency (customize patterns for your pipeline)
+    # 每階段延遲 (為您的管線自訂模式)
     stage_patterns = ["classifier", "rewriter", "executor", "retriever"]
     stage_times = {}
 
@@ -717,7 +717,7 @@ def stage_latency_scorer(trace: Trace) -> List[Feedback]:
             rationale=f"Stage '{stage}' took {time_ms:.2f}ms"
         ))
 
-    # Identify bottleneck
+    # 識別瓶頸
     if stage_times:
         bottleneck = max(stage_times, key=stage_times.get)
         feedbacks.append(Feedback(
@@ -731,9 +731,9 @@ def stage_latency_scorer(trace: Trace) -> List[Feedback]:
 
 ---
 
-## Pattern 16: Component Accuracy Factory
+## 模式 16：元件準確率工廠
 
-Create reusable scorers for any component/field combination.
+為任何元件/欄位組合建立可重用的評分器。
 
 ```python
 from mlflow.genai.scorers import scorer
@@ -745,12 +745,12 @@ def component_accuracy(
     output_field: str,
     expected_key: str = None
 ):
-    """Factory for component-specific accuracy scorers.
+    """元件特定準確率評分器的工廠。
 
     Args:
-        component_name: Pattern to match span names (e.g., "classifier")
-        output_field: Field to check in span outputs (e.g., "query_type")
-        expected_key: Key in expectations (defaults to f"expected_{output_field}")
+        component_name: 匹配 span 名稱的模式 (例如 "classifier")
+        output_field: span 輸出中要檢查的欄位 (例如 "query_type")
+        expected_key: expectations 中的鍵 (預設為 f"expected_{output_field}")
 
     Example:
         router_accuracy = component_accuracy("router", "route", "expected_route")
@@ -774,7 +774,7 @@ def component_accuracy(
                 rationale=f"No {expected_key} in expectations"
             )
 
-        # Find component span
+        # 尋找元件 span
         spans = [
             s for s in trace.search_spans()
             if component_name.lower() in s.name.lower()
@@ -797,7 +797,7 @@ def component_accuracy(
 
     return _scorer
 
-# Usage examples:
+# 用法範例:
 classifier_accuracy = component_accuracy("classifier", "query_type", "expected_query_type")
 router_accuracy = component_accuracy("router", "route", "expected_route")
 intent_accuracy = component_accuracy("intent", "intent_type", "expected_intent")

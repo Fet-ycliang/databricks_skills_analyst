@@ -1,31 +1,31 @@
 ---
 name: kafka-streaming
-description: Comprehensive Kafka streaming patterns including Kafka-to-Delta ingestion, Kafka-to-Kafka pipelines, and Real-Time Mode for sub-second latency. Use when building Kafka ingestion pipelines, implementing event enrichment, format transformation, or low-latency streaming workloads.
+description: 綜合 Kafka 串流模式，包含 Kafka-to-Delta 攝取、Kafka-to-Kafka 管線，以及適用於亞秒級延遲的即時模式 (Real-Time Mode)。適用於建構 Kafka 攝取管線、實作事件豐富化、格式轉換或低延遲串流工作負載。
 ---
 
-# Kafka Streaming Patterns
+# Kafka 串流模式 (Kafka Streaming Patterns)
 
-Comprehensive guide to Kafka streaming with Spark Structured Streaming: ingestion to Delta, Kafka-to-Kafka pipelines, and Real-Time Mode for sub-second latency.
+Spark Structured Streaming 的 Kafka 串流綜合指南：從攝取至 Delta、Kafka-to-Kafka 管線，以及適用於亞秒級延遲的即時模式。
 
-## Quick Start
+## 快速入門 (Quick Start)
 
-### Kafka to Delta
+### Kafka 到 Delta (Kafka to Delta)
 
 ```python
 from pyspark.sql.functions import col, from_json
 
-# Read from Kafka
+# 從 Kafka 讀取
 df = (spark
     .readStream
     .format("kafka")
     .option("kafka.bootstrap.servers", "broker1:9092,broker2:9092")
     .option("subscribe", "topic_name")
     .option("startingOffsets", "earliest")
-    .option("minPartitions", "6")  # Match Kafka partitions
+    .option("minPartitions", "6")  # 配合 Kafka 分區數
     .load()
 )
 
-# Parse JSON value
+# 解析 JSON value
 df_parsed = df.select(
     col("key").cast("string"),
     from_json(col("value").cast("string"), event_schema).alias("data"),
@@ -33,7 +33,7 @@ df_parsed = df.select(
     col("timestamp").alias("kafka_timestamp")
 ).select("key", "data.*", "topic", "partition", "offset", "kafka_timestamp")
 
-# Write to Delta
+# 寫入至 Delta
 df_parsed.writeStream \
     .format("delta") \
     .outputMode("append") \
@@ -42,12 +42,12 @@ df_parsed.writeStream \
     .start("/delta/bronze_events")
 ```
 
-### Kafka to Kafka
+### Kafka 到 Kafka (Kafka to Kafka)
 
 ```python
 from pyspark.sql.functions import col, from_json, to_json, struct, current_timestamp
 
-# Read from source Kafka
+# 從來源 Kafka 讀取
 source_df = (spark
     .readStream
     .format("kafka")
@@ -57,21 +57,21 @@ source_df = (spark
     .load()
 )
 
-# Parse and transform
+# 解析與轉換
 parsed_df = source_df.select(
     col("key").cast("string"),
     from_json(col("value").cast("string"), event_schema).alias("data"),
     col("topic").alias("source_topic")
 ).select("key", "data.*", "source_topic")
 
-# Transform events
+# 轉換事件
 enriched_df = parsed_df.withColumn(
     "processed_at", current_timestamp()
 ).withColumn(
     "value", to_json(struct("event_id", "user_id", "event_type", "processed_at"))
 )
 
-# Write to output Kafka topic
+# 寫入至輸出 Kafka 主題
 enriched_df.select("key", "value").writeStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", "broker1:9092") \
@@ -81,16 +81,16 @@ enriched_df.select("key", "value").writeStream \
     .start()
 ```
 
-## Common Patterns
+## 常見模式 (Common Patterns)
 
-### Pattern 1: Bronze Layer Ingestion (Kafka to Delta)
+### 模式 1: Bronze 層攝取 (Kafka 到 Delta)
 
-Minimal transformation, preserve original columns:
+最小化轉換，保留原始欄位：
 
 ```python
-# Best practice: Minimal transformation, preserve original columns
-# Why: Kafka retention is expensive (default 7 days)
-# Delta provides permanent storage with full history
+# 最佳實踐: 最小化轉換，保留原始欄位
+# 原因: Kafka 保留成本高 (預設 7 天)
+# Delta 提供具備完整歷史的永久儲存
 
 df_bronze = (spark
     .readStream
@@ -98,7 +98,7 @@ df_bronze = (spark
     .option("kafka.bootstrap.servers", servers)
     .option("subscribe", topic)
     .option("startingOffsets", "earliest")
-    .option("maxOffsetsPerTrigger", 10000)  # Control batch size
+    .option("maxOffsetsPerTrigger", 10000)  # 控制批次大小
     .load()
     .select(
         col("key").cast("string"),
@@ -117,77 +117,77 @@ df_bronze.writeStream \
     .start("/delta/bronze_events")
 ```
 
-### Pattern 2: Scheduled Streaming (Cost-Optimized)
+### 模式 2: 排程串流 (成本優化)
 
-Run periodically instead of continuously:
+定期執行而非持續執行：
 
 ```python
-# Run every 4 hours, not continuously
-# Same code, just change trigger in job scheduler
+# 每 4 小時執行一次，而非持續執行
+# 程式碼相同，僅需在工作排程器中變更 trigger
 
 df_bronze.writeStream \
     .format("delta") \
     .outputMode("append") \
     .option("checkpointLocation", "/Volumes/catalog/checkpoints/bronze_events") \
-    .trigger(availableNow=True) \  # Process all available, then stop
+    .trigger(availableNow=True) \  # 處理所有可用資料後停止
     .start("/delta/bronze_events")
 
-# In Databricks Jobs:
-# - Schedule: Every 4 hours
-# - Cluster: Fixed size (no autoscaling for streaming)
-# - Same streaming code, batch-style execution
+# 在 Databricks Jobs 中:
+# - 排程: 每 4 小時
+# - 叢集: 固定大小 (串流不使用自動縮放)
+# - 相同的串流程式碼，採批次式執行
 ```
 
-### Pattern 3: Real-Time Mode (Sub-Second Latency)
+### 模式 3: 即時模式 (亞秒級延遲)
 
-Use RTM for < 800ms latency requirements:
+當延遲需求 < 800ms 時使用 RTM：
 
 ```python
-# Real-time trigger (Databricks 13.3+)
+# 即時觸發 (Databricks 13.3+)
 query = (enriched_df
     .select(col("key"), col("value"))
     .writeStream
     .format("kafka")
     .option("kafka.bootstrap.servers", brokers)
     .option("topic", "output-events")
-    .trigger(realTime=True)  # Enable RTM
+    .trigger(realTime=True)  # 啟用 RTM
     .option("checkpointLocation", checkpoint_path)
     .start()
 )
 
-# RTM Cluster Requirements
+# RTM 叢集需求
 spark.conf.set("spark.databricks.photon.enabled", "true")
 spark.conf.set("spark.sql.streaming.stateStore.providerClass", 
                "com.databricks.sql.streaming.state.RocksDBStateProvider")
 
-# When to use RTM:
-# - Latency < 800ms required
-# - Photon enabled
-# - Fixed-size cluster (no autoscaling)
+# 何時使用 RTM:
+# - 延遲需求 < 800ms
+# - 啟用 Photon
+# - 固定大小叢集 (無自動縮放)
 ```
 
-### Pattern 4: Event Enrichment (Kafka to Kafka with Delta)
+### 模式 4: 事件豐富化 (Kafka 到 Kafka 搭配 Delta)
 
-Enrich events with dimension data:
+使用維度資料豐富事件：
 
 ```python
-# Read reference data (Delta table - auto-refreshed each microbatch)
+# 讀取參考資料 (Delta table - 每個微批次自動重新整理)
 user_dim = spark.table("users.dimension")
 
-# Stream-static join for enrichment
+# 串流靜態關連 (Stream-static join) 進行豐富化
 enriched = (parsed_df
     .join(user_dim, "user_id", "left")
     .withColumn("enriched_value", to_json(struct(
         col("event_id"),
         col("user_id"),
-        col("user_name"),  # From dimension table
-        col("user_segment"),  # From dimension table
+        col("user_name"),  # 來自維度表
+        col("user_segment"),  # 來自維度表
         col("event_type"),
         col("timestamp")
     )))
 )
 
-# Write enriched events to Kafka
+# 寫入豐富化事件至 Kafka
 enriched.select(col("key"), col("enriched_value").alias("value")).writeStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", brokers) \
@@ -197,15 +197,15 @@ enriched.select(col("key"), col("enriched_value").alias("value")).writeStream \
     .start()
 ```
 
-### Pattern 5: Multi-Topic Routing
+### 模式 5: 多主題路由 (Multi-Topic Routing)
 
-Route events to different Kafka topics:
+將事件路由至不同的 Kafka 主題：
 
 ```python
 def route_events(batch_df, batch_id):
-    """Route events to different Kafka topics"""
+    """將事件路由至不同 Kafka 主題"""
     
-    # High priority → urgent topic
+    # 高優先級 → 緊急主題
     high_priority = batch_df.filter(col("priority") == "high")
     if high_priority.count() > 0:
         high_priority.select("key", "value").write \
@@ -214,7 +214,7 @@ def route_events(batch_df, batch_id):
             .option("topic", "urgent-events") \
             .save()
     
-    # Errors → DLQ topic
+    # 錯誤 → DLQ 主題
     errors = batch_df.filter(col("event_type") == "error")
     if errors.count() > 0:
         errors.select("key", "value").write \
@@ -223,7 +223,7 @@ def route_events(batch_df, batch_id):
             .option("topic", "error-events-dlq") \
             .save()
     
-    # All events → standard topic
+    # 所有事件 → 標準主題
     batch_df.select("key", "value").write \
         .format("kafka") \
         .option("kafka.bootstrap.servers", brokers) \
@@ -237,26 +237,26 @@ parsed_df.writeStream \
     .start()
 ```
 
-### Pattern 6: Schema Validation with DLQ
+### 模式 6: 結構描述驗證與 DLQ
 
-Validate schema and route invalid records:
+驗證結構描述並路由無效記錄：
 
 ```python
 from pyspark.sql.functions import from_json, col, lit, to_json, struct, current_timestamp
 
 def validate_and_route(batch_df, batch_id):
-    """Validate schema, route bad records to DLQ"""
+    """驗證結構描述，將不良記錄路由至 DLQ"""
     
-    # Try to parse with strict schema
+    # 嘗試使用嚴格結構描述進行解析
     parsed = batch_df.withColumn(
         "parsed",
         from_json(col("value").cast("string"), validated_schema)
     )
     
-    # Valid records
+    # 有效記錄
     valid = parsed.filter(col("parsed").isNotNull()).select("key", "value")
     
-    # Invalid records → DLQ
+    # 無效記錄 → DLQ
     invalid = parsed.filter(col("parsed").isNull()).select(
         col("key"),
         to_json(struct(
@@ -266,14 +266,14 @@ def validate_and_route(batch_df, batch_id):
         )).alias("value")
     )
     
-    # Write valid to main topic
+    # 寫入有效記錄至主主題
     if valid.count() > 0:
         valid.write.format("kafka") \
             .option("kafka.bootstrap.servers", brokers) \
             .option("topic", "valid-events") \
             .save()
     
-    # Write invalid to DLQ
+    # 寫入無效記錄至 DLQ
     if invalid.count() > 0:
         invalid.write.format("kafka") \
             .option("kafka.bootstrap.servers", brokers) \
@@ -287,9 +287,9 @@ source_df.writeStream \
     .start()
 ```
 
-## Configuration
+## 設定 (Configuration)
 
-### Consumer Options (Reading from Kafka)
+### 消費者選項 (從 Kafka 讀取)
 
 ```python
 (spark
@@ -297,16 +297,16 @@ source_df.writeStream \
     .format("kafka")
     .option("kafka.bootstrap.servers", "host1:9092,host2:9092")
     .option("subscribe", "source-topic")
-    .option("startingOffsets", "latest")  # latest, earliest, or specific JSON
-    .option("maxOffsetsPerTrigger", "10000")  # Control batch size
-    .option("minPartitions", "6")  # Match Kafka partitions
+    .option("startingOffsets", "latest")  # latest, earliest, 或特定 JSON
+    .option("maxOffsetsPerTrigger", "10000")  # 控制批次大小
+    .option("minPartitions", "6")  # 配合 Kafka 分區數
     .option("kafka.auto.offset.reset", "latest")
-    .option("kafka.enable.auto.commit", "false")  # Spark manages offsets
+    .option("kafka.enable.auto.commit", "false")  # Spark 管理 offsets
     .load()
 )
 ```
 
-### Producer Options (Writing to Kafka)
+### 生產者選項 (寫入至 Kafka)
 
 ```python
 (df
@@ -315,7 +315,7 @@ source_df.writeStream \
     .format("kafka")
     .option("kafka.bootstrap.servers", "host1:9092,host2:9092")
     .option("topic", "target-topic")
-    .option("kafka.acks", "all")  # Durability: all, 1, 0
+    .option("kafka.acks", "all")  # 持久性: all, 1, 0
     .option("kafka.retries", "3")
     .option("kafka.batch.size", "16384")
     .option("kafka.linger.ms", "5")
@@ -325,14 +325,14 @@ source_df.writeStream \
 )
 ```
 
-### Security (SASL/SSL)
+### 安全性 (SASL/SSL)
 
 ```python
-# Using Databricks secrets
+# 使用 Databricks secrets
 kafka_username = dbutils.secrets.get("kafka-scope", "username")
 kafka_password = dbutils.secrets.get("kafka-scope", "password")
 
-# SASL/PLAIN Authentication
+# SASL/PLAIN 驗證
 df.writeStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", brokers) \
@@ -345,34 +345,34 @@ df.writeStream \
     .start()
 ```
 
-## Performance Tuning
+## 效能調校 (Performance Tuning)
 
-| Parameter | Recommendation | Why |
+| 參數 | 建議 | 原因 |
 |-----------|---------------|-----|
-| minPartitions | Match Kafka partitions | Optimal parallelism |
-| maxOffsetsPerTrigger | 10,000-100,000 | Balance latency vs throughput |
-| trigger interval | Business SLA / 3 | Recovery time buffer |
-| RTM | Only if < 800ms required | Microbatch more cost-effective |
+| minPartitions | 配合 Kafka 分區數 | 最佳化平行度 |
+| maxOffsetsPerTrigger | 10,000-100,000 | 平衡延遲與吞吐量 |
+| trigger interval | 業務 SLA / 3 | 復原緩衝時間 |
+| RTM | 僅在需求 < 800ms 時使用 | 微批次更具成本效益 |
 
-## Monitoring
+## 監控 (Monitoring)
 
-### Key Metrics
+### 關鍵指標 (Key Metrics)
 
 ```python
-# Programmatic monitoring
+# 程式化監控
 for stream in spark.streams.active:
     progress = stream.lastProgress
     if progress:
         print(f"Input rate: {progress.get('inputRowsPerSecond', 0)} rows/sec")
         print(f"Processing rate: {progress.get('processedRowsPerSecond', 0)} rows/sec")
         
-        # Kafka-specific metrics
+        # Kafka 特定指標
         sources = progress.get("sources", [])
         for source in sources:
             end_offset = source.get("endOffset", {})
             latest_offset = source.get("latestOffset", {})
             
-            # Calculate lag per partition
+            # 計算每個分區的 Lag
             for topic, partitions in end_offset.items():
                 for partition, end in partitions.items():
                     latest = latest_offset.get(topic, {}).get(partition, end)
@@ -380,38 +380,38 @@ for stream in spark.streams.active:
                     print(f"Topic {topic}, Partition {partition}: Lag = {lag}")
 ```
 
-### Spark UI Checks
+### Spark UI 檢查
 
-- **Input Rate vs Processing Rate**: Processing must be > Input
-- **Max Offsets Behind Latest**: Should be consistent or dropping
-- **Batch Duration**: Should be < trigger interval
+- **Input Rate vs Processing Rate**: Processing 必須 > Input
+- **Max Offsets Behind Latest**: 應保持一致或下降
+- **Batch Duration**: 應 < trigger interval
 
-## Common Issues
+## 常見問題 (Common Issues)
 
-| Issue | Cause | Solution |
+| 問題 | 原因 | 解決方案 |
 |-------|-------|----------|
-| **No data being read** | `startingOffsets` default is "latest" | Use "earliest" for existing data |
-| **High latency** | Microbatch overhead | Use RTM (trigger(realTime=True)) |
-| **Consumer lag** | Processing < Input rate | Scale cluster; reduce maxOffsetsPerTrigger |
-| **Duplicate messages** | Exactly-once not configured | Enable idempotent producer (acks=all) |
-| **Falling behind** | Processing < Input rate | Increase cluster size |
-| **Can't use autoscaling** | Streaming requirement | Use fixed-size clusters |
+| **未讀取到資料** | `startingOffsets` 預設為 "latest" | 針對現有資料使用 "earliest" |
+| **高延遲** | 微批次額外開銷 | 使用 RTM (trigger(realTime=True)) |
+| **Consumer lag** | Processing < Input rate | 擴展叢集; 降低 maxOffsetsPerTrigger |
+| **重複訊息** | 未設定 Exactly-once | 啟用冪等生產者 (acks=all) |
+| **進度落後** | Processing < Input rate | 增加叢集大小 |
+| **無法使用自動縮放** | 串流需求 | 使用固定大小叢集 |
 
-## Production Checklist
+## 生產檢核清單 (Production Checklist)
 
-- [ ] Checkpoint location is persistent (UC volumes, not DBFS)
-- [ ] Unique checkpoint per pipeline
-- [ ] Fixed-size cluster (no autoscaling for streaming/RTM)
-- [ ] RTM enabled only if latency < 800ms required
-- [ ] Consumer lag monitored and alerts configured
-- [ ] Producer acks=all for durability
-- [ ] Schema validation with DLQ configured
-- [ ] Security (SASL/SSL) configured for production
-- [ ] Exactly-once semantics verified
+- [ ] 檢查點位置為持久化儲存 (UC volumes, 非 DBFS)
+- [ ] 每個管線使用唯一檢查點
+- [ ] 固定大小叢集 (串流/RTM 不使用自動縮放)
+- [ ] 僅在延遲需求 < 800ms 時啟用 RTM
+- [ ] 監控 Consumer lag 並設定警報
+- [ ] Producer 設定 acks=all 以確保持久性
+- [ ] 設定結構描述驗證與 DLQ
+- [ ] 為生產環境設定安全性 (SASL/SSL)
+- [ ] 驗證 Exactly-once 語義
 
-## Related Skills
+## 相關技能 (Related Skills)
 
-- `stream-static-joins` - Enrichment patterns with Delta tables
-- `stream-stream-joins` - Event correlation across Kafka topics
-- `checkpoint-best-practices` - Checkpoint configuration
-- `trigger-tuning` - Trigger configuration and RTM setup
+- `stream-static-joins` - Delta 資料表的豐富化模式
+- `stream-stream-joins` - 跨 Kafka 主題的事件關聯
+- `checkpoint-best-practices` - 檢查點設定
+- `trigger-tuning` - 觸發器設定與 RTM 設置

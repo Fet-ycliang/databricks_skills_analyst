@@ -1,20 +1,20 @@
 ---
 name: merge-operations
-description: Comprehensive guide to Delta MERGE operations in streaming including performance optimization, parallel merges, and Liquid Clustering configuration. Use when implementing upserts, optimizing merge performance, performing parallel merges to multiple tables, or eliminating optimize pauses.
+description: 串流中 Delta MERGE 操作的綜合指南，包括效能優化、平行合併 (Parallel Merges) 以及 Liquid Clustering 設定。適用於實作 Upserts、優化合併效能、執行多表平行合併，或消除最佳化暫停 (Optimize Pauses)。
 ---
 
-# Merge Operations in Streaming
+# 串流中的合併操作 (Merge Operations)
 
-Comprehensive guide to Delta MERGE operations: performance optimization, parallel merges to multiple tables, and modern Delta features (Liquid Clustering + Deletion Vectors + Row-Level Concurrency).
+Delta MERGE 操作綜合指南：效能優化、多表平行合併，以及現代 Delta 功能 (Liquid Clustering + Deletion Vectors + Row-Level Concurrency)。
 
-## Quick Start
+## 快速入門 (Quick Start)
 
-### Basic MERGE with Optimization
+### 具備優化的基本 MERGE
 
 ```python
 from delta.tables import DeltaTable
 
-# Enable modern Delta features
+# 啟用現代 Delta 功能
 spark.sql("""
     ALTER TABLE target_table SET TBLPROPERTIES (
         'delta.enableDeletionVectors' = true,
@@ -23,7 +23,7 @@ spark.sql("""
     )
 """)
 
-# MERGE in ForEachBatch
+# ForEachBatch 中的 MERGE
 def upsert_batch(batch_df, batch_id):
     batch_df.createOrReplaceTempView("updates")
     spark.sql("""
@@ -32,7 +32,7 @@ def upsert_batch(batch_df, batch_id):
         WHEN MATCHED THEN UPDATE SET *
         WHEN NOT MATCHED THEN INSERT *
     """)
-    # No optimize needed - Liquid Clustering handles it automatically
+    # 無需 optimize - Liquid Clustering 會自動處理
 
 stream.writeStream \
     .foreachBatch(upsert_batch) \
@@ -40,14 +40,14 @@ stream.writeStream \
     .start()
 ```
 
-### Parallel MERGE to Multiple Tables
+### 多資料表平行 MERGE
 
 ```python
 from delta.tables import DeltaTable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 def parallel_merge_multiple_tables(batch_df, batch_id):
-    """Merge into multiple tables in parallel"""
+    """平行合併至多個資料表"""
     
     batch_df.cache()
     
@@ -69,7 +69,7 @@ def parallel_merge_multiple_tables(batch_df, batch_id):
         ("silver.products", "product_id")
     ]
     
-    # Parallel merges
+    # 平行合併
     with ThreadPoolExecutor(max_workers=3) as executor:
         futures = {
             executor.submit(merge_table, table_name, merge_key): table_name
@@ -77,7 +77,7 @@ def parallel_merge_multiple_tables(batch_df, batch_id):
         }
         
         for future in as_completed(futures):
-            future.result()  # Raise on error
+            future.result()  # 發生錯誤時拋出
     
     batch_df.unpersist()
 
@@ -87,14 +87,14 @@ stream.writeStream \
     .start()
 ```
 
-## Core Concepts
+## 核心概念 (Core Concepts)
 
 ### Liquid Clustering + DV + RLC
 
-Enable modern Delta features for optimal merge performance:
+啟用現代 Delta 功能以獲得最佳合併效能：
 
 ```sql
--- Enable for target table
+-- 為目標資料表啟用
 ALTER TABLE target_table SET TBLPROPERTIES (
     'delta.enableDeletionVectors' = true,
     'delta.enableRowLevelConcurrency' = true,
@@ -102,19 +102,19 @@ ALTER TABLE target_table SET TBLPROPERTIES (
 );
 ```
 
-**Benefits:**
-- **Deletion Vectors**: Soft deletes without file rewrite
-- **Row-Level Concurrency**: Concurrent updates to different rows
-- **Liquid Clustering**: Automatic optimization without pauses
-- **Result**: Eliminates optimize pauses, lower P99 latency, simpler code
+**效益：**
+- **刪除向量 (Deletion Vectors)**：軟刪除 (Soft deletes) 無需重寫檔案
+- **資料列層級並行 (Row-Level Concurrency)**：不同資料列的並行更新
+- **Liquid Clustering**：無暫停的自動優化
+- **結果**：消除最佳化暫停、降低 P99 延遲、程式碼更簡潔
 
-## Common Patterns
+## 常見模式 (Common Patterns)
 
-### Pattern 1: Basic MERGE with Optimization
+### 模式 1: 具備優化的基本 MERGE
 
 ```python
 def optimized_merge(batch_df, batch_id):
-    """MERGE with optimized table"""
+    """合併至已優化的資料表"""
     batch_df.createOrReplaceTempView("updates")
     
     spark.sql("""
@@ -123,7 +123,7 @@ def optimized_merge(batch_df, batch_id):
         WHEN MATCHED THEN UPDATE SET *
         WHEN NOT MATCHED THEN INSERT *
     """)
-    # No optimize needed - Liquid Clustering handles it
+    # 無需 optimize - Liquid Clustering 會處理
 
 stream.writeStream \
     .foreachBatch(optimized_merge) \
@@ -131,13 +131,13 @@ stream.writeStream \
     .start()
 ```
 
-### Pattern 2: Parallel MERGE to Multiple Tables
+### 模式 2: 多資料表平行 MERGE
 
 ```python
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 def parallel_merge(batch_df, batch_id):
-    """Merge into multiple tables in parallel"""
+    """平行合併至多個資料表"""
     
     batch_df.cache()
     
@@ -159,7 +159,7 @@ def parallel_merge(batch_df, batch_id):
         ("silver.products", "product_id")
     ]
     
-    # Optimal thread count: min(number_of_tables, cluster_cores / 2)
+    # 最佳執行緒數: min(資料表數量, 叢集核心數 / 2)
     max_workers = min(len(tables), max(2, total_cores // 2))
     
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -182,33 +182,33 @@ def parallel_merge(batch_df, batch_id):
         raise Exception(f"Merge failures: {errors}")
 ```
 
-### Pattern 3: MERGE with Partition Pruning
+### 模式 3: 具備分區修剪 (Partition Pruning) 的 MERGE
 
 ```python
 def partition_pruned_merge(batch_df, batch_id):
-    """MERGE with partition column in condition"""
+    """條件中包含分區欄位的 MERGE"""
     batch_df.createOrReplaceTempView("updates")
     
-    # Include partition column in merge condition
+    # 在合併條件中包含分區欄位
     spark.sql("""
         MERGE INTO target_table t
         USING updates s 
-        ON t.id = s.id AND t.date = s.date  -- partition column
+        ON t.id = s.id AND t.date = s.date  -- 分區欄位
         WHEN MATCHED THEN UPDATE SET *
         WHEN NOT MATCHED THEN INSERT *
     """)
-    # Skips irrelevant partitions for faster execution
+    # 跳過無關分區以加速執行
 ```
 
-### Pattern 4: CDC Multi-Target with Parallel MERGE
+### 模式 4: CDC 多目標平行 MERGE
 
 ```python
 def cdc_parallel_merge(batch_df, batch_id):
-    """Apply CDC changes to multiple tables in parallel"""
+    """平行套用 CDC 變更至多個資料表"""
     
     batch_df.cache()
     
-    # Split by operation type
+    # 依操作類型拆分
     deletes = batch_df.filter(col("_op") == "DELETE")
     upserts = batch_df.filter(col("_op").isin(["INSERT", "UPDATE"]))
     
@@ -249,12 +249,12 @@ def cdc_parallel_merge(batch_df, batch_id):
     batch_df.unpersist()
 ```
 
-## Performance Optimization
+## 效能優化 (Performance Optimization)
 
-### Enable Liquid Clustering + DV + RLC
+### 啟用 Liquid Clustering + DV + RLC
 
 ```sql
--- Create table with Liquid Clustering
+-- 建立具備 Liquid Clustering 的資料表
 CREATE TABLE target_table (
     id STRING,
     name STRING,
@@ -266,7 +266,7 @@ TBLPROPERTIES (
     'delta.enableRowLevelConcurrency' = true
 );
 
--- Or alter existing table
+-- 或修改現有資料表
 ALTER TABLE target_table SET TBLPROPERTIES (
     'delta.enableDeletionVectors' = true,
     'delta.enableRowLevelConcurrency' = true,
@@ -275,38 +275,38 @@ ALTER TABLE target_table SET TBLPROPERTIES (
 ALTER TABLE target_table CLUSTER BY (id);
 ```
 
-### Z-Ordering on Merge Key
+### 合併鍵 (Merge Key) 的 Z-Ordering
 
 ```sql
--- Z-Order on merge key for faster lookups
+-- 對合併鍵進行 Z-Order 以加速查詢
 OPTIMIZE target_table ZORDER BY (id);
 
--- Run periodically or via Predictive Optimization
--- 5-10x faster for targeted lookups
+-- 定期執行或透過 Predictive Optimization 執行
+-- 對於特定查詢可快 5-10 倍
 ```
 
-### File Size Tuning
+### 檔案大小調校 (File Size Tuning)
 
 ```sql
--- Target file size for optimal merge
+-- 設定最佳合併的目標檔案大小
 ALTER TABLE target_table SET TBLPROPERTIES (
     'delta.targetFileSize' = '128mb'
 );
 ```
 
-### Optimal Thread Count
+### 最佳執行緒數 (Optimal Thread Count)
 
 ```python
-# Formula: min(number_of_tables, cluster_cores / 2)
-# Example: 4 tables, 8 cores → 4 workers
-# Example: 2 tables, 4 cores → 2 workers
+# 公式: min(資料表數量, 叢集核心數 / 2)
+# 範例: 4 tables, 8 cores → 4 workers
+# 範例: 2 tables, 4 cores → 2 workers
 
 max_workers = min(len(tables), max(2, total_cores // 2))
 ```
 
-## Monitoring
+## 監控 (Monitoring)
 
-### Track Merge Performance
+### 追蹤合併效能
 
 ```python
 import time
@@ -325,34 +325,34 @@ def monitored_merge(batch_df, batch_id):
     duration = time.time() - start_time
     print(f"Merge duration: {duration:.2f}s")
     
-    # Alert if duration exceeds threshold
+    # 若執行時間超過閾值則發出警報
     if duration > 30:
         print(f"WARNING: Merge duration {duration:.2f}s exceeds threshold")
 ```
 
-## Common Issues
+## 常見問題 (Common Issues)
 
-| Issue | Cause | Solution |
+| 問題 | 原因 | 解決方案 |
 |-------|-------|----------|
-| **High P99 latency** | OPTIMIZE pauses | Enable Liquid Clustering (no pauses) |
-| **Merge conflicts** | Concurrent updates to same rows | Enable Row-Level Concurrency |
-| **Slow merges** | Large files, no optimization | Enable Liquid Clustering; Z-Order on merge key |
-| **Too many threads** | Resource contention | Reduce max_workers; match to cluster capacity |
-| **Partial failures** | One merge fails | Collect all errors; fail batch if any error |
+| **高 P99 延遲** | OPTIMIZE 暫停 | 啟用 Liquid Clustering (無暫停) |
+| **合併衝突** | 同時更新相同資料列 | 啟用 Row-Level Concurrency |
+| **合併緩慢** | 大檔案、未優化 | 啟用 Liquid Clustering; 對合併鍵進行 Z-Order |
+| **執行緒過多** | 資源競爭 | 減少 max_workers; 配合叢集容量 |
+| **部分失敗** | 單一合併失敗 | 收集所有錯誤; 若有任何錯誤則整批失敗 |
 
-## Production Checklist
+## 生產檢核清單 (Production Checklist)
 
-- [ ] Liquid Clustering + DV + RLC enabled on all target tables
-- [ ] Z-Ordering configured on merge keys
-- [ ] Optimal thread count configured (start with 2)
-- [ ] Error handling implemented (collect all errors)
-- [ ] Performance monitoring per table
-- [ ] Cache used to avoid recomputation
-- [ ] Unpersist after writes
-- [ ] File size tuned (128MB target)
+- [ ] 所有目標資料表啟用 Liquid Clustering + DV + RLC
+- [ ] 合併鍵設定 Z-Ordering
+- [ ] 設定最佳執行緒數 (從 2 開始)
+- [ ] 實作錯誤處理 (收集所有錯誤)
+- [ ] 每個資料表的效能監控
+- [ ] 使用 Cache 避免重複計算
+- [ ] 寫入後 Unpersist
+- [ ] 檔案大小調校 (目標 128MB)
 
-## Related Skills
+## 相關技能 (Related Skills)
 
-- `multi-sink-writes` - Multi-sink write patterns
-- `partitioning-strategy` - Partition optimization for merges
-- `checkpoint-best-practices` - Checkpoint configuration
+- `multi-sink-writes` - 多重目標寫入模式
+- `partitioning-strategy` - 合併的分區優化
+- `checkpoint-best-practices` - 檢查點設定
