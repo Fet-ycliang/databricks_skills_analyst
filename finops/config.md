@@ -6,7 +6,7 @@
 
 請將以下環境變數設定為實際的 Genie Space ID：
 
-* **`GENIE_FINOPS_SPACE_ID`** = `請填入 Azure Cost Optimization 的 Space ID`
+* **`GENIE_FINOPS_SPACE_ID`** = `01f109d210d111548bdc9254d6bc148f`
   * 用途：成本分析、成本趨勢、節費方案、成本優化、閒置資源分析
   * Space 名稱：Azure Cost Optimization
 

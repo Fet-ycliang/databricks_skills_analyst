@@ -1,0 +1,113 @@
+name: Genie Conversation Flow
+version: 1.0
+description: Genie Skill 對話管理的狀態機定義，描述從啟動到結束的完整流程。
+last_updated: 2024-02-10
+
+states:
+  IDLE:
+    description: 初始狀態，等待用戶輸入。
+    transitions:
+      - target: SELECT_SPACE
+        condition: 用戶詢問與成本、儲存或工作流相關的問題
+      - target: IGNORE
+        condition: 用戶詢問無關問題 (非 Genie 範疇)
+
+  SELECT_SPACE:
+    description: 根據問題主題決定適當的 Genie Space ID。
+    actions:
+      - 識別問題意圖 (Cost/Storage/Workflow)
+      - 從 config.md 獲取對應的 Space ID
+    transitions:
+      - target: START_CONVERSATION
+        condition: 成功識別 Space ID
+      - target: ERROR
+        condition: 無法識別 Space ID 或 Space ID 未配置
+
+  START_CONVERSATION:
+    description: 與 Genie 建立新的對話會話。
+    actions:
+      - 調用 start_conversation(space_id, question)
+      - 保存返回的 conversation_id
+    transitions:
+      - target: PROCESSING_RESPONSE
+        condition: API 調用成功，進入等待狀態
+      - target: ERROR
+        condition: API 調用失敗或網絡錯誤
+
+  PROCESSING_RESPONSE:
+    description: 等待 Genie 處理查詢並生成回應。
+    actions:
+      - 輪詢 API 直到狀態為 COMPLETED
+      - 處理超時 (timeout)
+    transitions:
+      - target: PRESENT_RESULT
+        condition: 收到完整回應 (包含答案/SQL)
+      - target: ERROR
+        condition: 超時或後端處理失敗
+
+  PRESENT_RESULT:
+    description: 向用戶展示查詢結果。
+    actions:
+      - 展示自然語言答案
+      - 展示生成的 SQL (針對技術用戶)
+      - 展示建議的後續問題
+    transitions:
+      - target: AWAIT_FOLLOWUP
+        condition: 結果展示完畢
+
+  AWAIT_FOLLOWUP:
+    description: 保持對話上下文，等待用戶進一步行動。
+    context_retention:
+      - 保留 conversation_id
+      - 保留 space_id
+      - 保留上一輪的查詢上下文
+    transitions:
+      - target: ASK_FOLLOWUP
+        condition: 用戶提出相關的追問
+      - target: CLEANUP
+        condition: 用戶切換話題、要求重置或長時間無回應
+
+  ASK_FOLLOWUP:
+    description: 在現有對話中進行追問。
+    actions:
+      - 調用 ask_followup(conversation_id, question)
+    transitions:
+      - target: PROCESSING_RESPONSE
+        condition: API 調用成功
+      - target: ERROR
+        condition: API 調用失敗 (如對話已失效)
+
+  CLEANUP:
+    description: 結束對話並釋放資源。
+    actions:
+      - 調用 delete_conversation(conversation_id)
+      - 清除本地保存的 conversation_id
+    transitions:
+      - target: IDLE
+        condition: 清理完成，準備接受新話題
+      - target: SELECT_SPACE
+        condition: 清理後立即開始新話題 (如切換 Space)
+
+  ERROR:
+    description: 錯誤處理狀態。
+    actions:
+      - 記錄錯誤日誌
+      - 向用戶展示友好的錯誤訊息
+      - 根據錯誤類型決定是否保留上下文
+    transitions:
+      - target: AWAIT_FOLLOWUP
+        condition: 可恢復的錯誤 (如查詢超時，但對話仍在)
+      - target: IDLE
+        condition: 不可恢復的錯誤 (如 Space ID 無效)
+
+error_handling:
+  retry_policy:
+    - 網絡超時: 自動重試 1 次
+    - 認證失敗: 立即報錯，不重試
+  fallback:
+    - 如果 Genie 無法回答，建議用戶檢查問題描述
+    - 如果 Space ID 錯誤，提示檢查配置
+
+context_rules:
+  - 只有在用戶明確切換話題或說「重新開始」時才清除 conversation_id
+  - 跨 Space 的問題必須觸發 CLEANUP -> SELECT_SPACE 流程

@@ -1,0 +1,127 @@
+{
+  "description": "Genie Skill 的實際回應格式定義（基於 genie_query.py 的 _process_genie_response() 實作）",
+  "version": "1.0",
+  "last_updated": "2024-01-XX",
+  
+  "success_response": {
+    "description": "成功查詢的完整回應結構",
+    "example": {
+      "success": true,
+      "space_id": "01f0e260a114171bb6ef122f504a1528",
+      "conversation_id": "01234567-89ab-cdef-0123-456789abcdef",
+      "message_id": "msg_12345678",
+      "question": "上個月 Databricks 的費用是多少？",
+      "answer": "上個月的 Azure 總成本為 $19,600。主要成本驅動因素為：Virtual Machines: $5,000 (25.5%)，Storage: $3,000 (15.3%)...",
+      "query": {
+        "description": "查詢上個月 Databricks 相關的成本總額",
+        "sql": "SELECT SUM(cost) as total_cost, service_name, SUM(cost) as service_cost FROM cost_table WHERE date >= '2024-01-01' AND date < '2024-02-01' GROUP BY service_name"
+      },
+      "suggested_questions": [
+        "能否按資源群組細分?",
+        "顯示過去 3 個月的成本趨勢",
+        "哪些服務成本增長最快?"
+      ]
+    },
+    "fields": {
+      "success": {
+        "type": "boolean",
+        "required": true,
+        "description": "查詢是否成功"
+      },
+      "space_id": {
+        "type": "string",
+        "required": true,
+        "description": "Genie Space ID（32 位 hex 字串）"
+      },
+      "conversation_id": {
+        "type": "string",
+        "required": true,
+        "description": "對話 ID（UUID 格式），用於後續追問"
+      },
+      "message_id": {
+        "type": "string",
+        "required": true,
+        "description": "消息 ID，用於追蹤特定查詢"
+      },
+      "question": {
+        "type": "string",
+        "required": true,
+        "description": "原始問題"
+      },
+      "answer": {
+        "type": "string",
+        "required": false,
+        "description": "Genie 生成的自然語言答案（從 attachments[].text.content 提取）"
+      },
+      "query": {
+        "type": "object",
+        "required": false,
+        "description": "查詢相關資訊",
+        "fields": {
+          "description": {
+            "type": "string",
+            "description": "Genie 對問題的理解和重新表述"
+          },
+          "sql": {
+            "type": "string",
+            "description": "Genie 生成的 SQL 查詢語句"
+          }
+        }
+      },
+      "suggested_questions": {
+        "type": "array",
+        "required": false,
+        "description": "Genie 建議的後續問題列表"
+      }
+    }
+  },
+
+  "error_response": {
+    "description": "查詢失敗時的錯誤回應結構",
+    "example": {
+      "success": false,
+      "error": "無效的 space_id 格式: invalid_id",
+      "space_id": "invalid_id"
+    },
+    "fields": {
+      "success": {
+        "type": "boolean",
+        "required": true,
+        "description": "固定為 false"
+      },
+      "error": {
+        "type": "string",
+        "required": true,
+        "description": "錯誤訊息"
+      },
+      "space_id": {
+        "type": "string",
+        "required": false,
+        "description": "Space ID（如果有提供）"
+      },
+      "conversation_id": {
+        "type": "string",
+        "required": false,
+        "description": "對話 ID（如果適用）"
+      }
+    }
+  },
+
+  "delete_response": {
+    "description": "刪除對話的回應結構",
+    "example": {
+      "success": true,
+      "message": "對話已成功刪除",
+      "space_id": "01f0e260a114171bb6ef122f504a1528",
+      "conversation_id": "01234567-89ab-cdef-0123-456789abcdef"
+    }
+  },
+
+  "implementation_notes": {
+    "response_format": "所有回應都是 JSON 字串格式",
+    "error_handling": "所有錯誤都返回統一的 JSON 格式（success: false）",
+    "space_id_format": "32 位 hex 字串（無連字號）",
+    "conversation_id_format": "UUID v4 格式",
+    "timeout_default": "20 分鐘（可透過 timeout_minutes 參數調整）"
+  }
+}
